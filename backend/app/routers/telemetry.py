@@ -7,8 +7,8 @@ from sqlmodel import Session, select
 
 from app import auth
 from app.analytics import analyze_to_dict
-from app.auth import get_current_user
 from app.database import get_session, new_session
+from app.deps import own_participation, user_may_view_session, visible_session
 from app.models import Session as SprintSession, SessionParticipant, TelemetryPoint, User, Vehicle
 from app.schemas import DriveAnalyticsSchema, TelemetrySchema, TelemetrySeriesPoint
 from app.ws_manager import manager
@@ -18,20 +18,11 @@ router = APIRouter(tags=["telemetry"])
 
 @router.get("/sessions/{session_id}/drive-analytics", response_model=DriveAnalyticsSchema)
 def drive_analytics(
-    session_id: int,
-    current_user: User = Depends(get_current_user),
+    participant: SessionParticipant = Depends(own_participation),
     db: Session = Depends(get_session),
 ) -> dict:
     """Drive Analytics + Driving Score + coach insights for the current user's
     drive within a session. Computed on demand from the telemetry stream."""
-    participant = db.exec(
-        select(SessionParticipant).where(
-            SessionParticipant.session_id == session_id,
-            SessionParticipant.user_id == current_user.id,
-        )
-    ).first()
-    if not participant:
-        raise HTTPException(status_code=404, detail="You did not participate in this session")
     points = db.exec(
         select(TelemetryPoint)
         .where(TelemetryPoint.participant_id == participant.id)
@@ -42,20 +33,25 @@ def drive_analytics(
 
 
 @router.get("/sessions/{session_id}/telemetry", response_model=List[TelemetrySeriesPoint])
-def session_telemetry(session_id: int, db: Session = Depends(get_session)) -> List[TelemetrySeriesPoint]:
-    sprint_session = db.get(SprintSession, session_id)
-    if not sprint_session:
-        raise HTTPException(status_code=404, detail="Session not found")
+def session_telemetry(
+    sprint_session: SprintSession = Depends(visible_session),
+    db: Session = Depends(get_session),
+) -> List[TelemetrySeriesPoint]:
+    """The full recorded stream for a session, used by the replay and the charts.
+
+    Gated on participation: these rows are GPS breadcrumbs of where real people
+    drove, tagged with their usernames.
+    """
     points = db.exec(
         select(TelemetryPoint)
-        .where(TelemetryPoint.session_id == session_id)
+        .where(TelemetryPoint.session_id == sprint_session.id)
         .order_by(TelemetryPoint.timestamp)
     ).all()
     if not points:
         return []
     # Map each participant to a username once, so the series are labelled.
     participants = db.exec(
-        select(SessionParticipant).where(SessionParticipant.session_id == session_id)
+        select(SessionParticipant).where(SessionParticipant.session_id == sprint_session.id)
     ).all()
     user_by_participant = {}
     for participant in participants:
@@ -89,8 +85,14 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int, token: str =
             user = auth.get_user_from_token(token, auth_db)
             user_id = user.id
             username = user.username
+            # A valid token is not enough — it has to be *your* race. Otherwise
+            # any signed-in user could tune into a stranger's live GPS feed.
+            is_participant = user_may_view_session(session_id, user_id, auth_db)
     except HTTPException:
         await websocket.close(code=4401)
+        return
+    if not is_participant:
+        await websocket.close(code=4403)
         return
     await manager.connect(str(session_id), websocket)
     await manager.broadcast(

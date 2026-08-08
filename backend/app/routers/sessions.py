@@ -12,6 +12,7 @@ from sqlmodel import Session, select
 
 from app.auth import get_current_user
 from app.database import get_session
+from app.deps import host_session, user_may_view_session, visible_session
 from app.models import (
     Session as SprintSession,
     SessionParticipant,
@@ -110,31 +111,44 @@ def start_solo_drive(
 
 
 # --- Reading -----------------------------------------------------------------
+#
+# Everything below is scoped to sessions the caller actually took part in. These
+# reads expose other people's names, vehicles and GPS traces, so "knows the
+# integer ID" is not an entitlement.
 
 
 @router.get("/sessions/{session_id}", response_model=SessionRead)
-def get_session_details(session_id: int, db: Session = Depends(get_session)) -> SprintSession:
-    try:
-        return db.exec(select(SprintSession).where(SprintSession.id == session_id)).one()
-    except NoResultFound:
-        raise HTTPException(status_code=404, detail="Session not found")
+def get_session_details(sprint_session: SprintSession = Depends(visible_session)) -> SprintSession:
+    return sprint_session
 
 
 @router.get("/sessions/room/{room_code}", response_model=SessionRead)
-def get_session_by_room(room_code: str, db: Session = Depends(get_session)) -> SprintSession:
+def get_session_by_room(
+    room_code: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_session),
+) -> SprintSession:
     try:
-        return db.exec(select(SprintSession).where(SprintSession.room_code == room_code)).one()
+        sprint_session = db.exec(
+            select(SprintSession).where(SprintSession.room_code == room_code)
+        ).one()
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Session not found")
+    # Join first, then read: this endpoint confirms a session you're already in,
+    # it isn't a way to browse rooms by guessing codes.
+    if not user_may_view_session(sprint_session.id, current_user.id, db):
+        raise HTTPException(status_code=404, detail="Session not found")
+    return sprint_session
 
 
 @router.get("/sessions/{session_id}/participants", response_model=List[SessionParticipantRead])
 def get_session_participants(
-    session_id: int, db: Session = Depends(get_session)
+    sprint_session: SprintSession = Depends(visible_session),
+    db: Session = Depends(get_session),
 ) -> List[SessionParticipantRead]:
     participants = db.exec(
         select(SessionParticipant).where(
-            SessionParticipant.session_id == session_id,
+            SessionParticipant.session_id == sprint_session.id,
             SessionParticipant.left_at == None,  # noqa: E711 -- SQLAlchemy IS NULL
         )
     ).all()
@@ -161,12 +175,12 @@ def get_session_participants(
 
 
 @router.get("/sessions/{session_id}/results", response_model=List[SessionResultRead])
-def get_session_results(session_id: int, db: Session = Depends(get_session)) -> List[SessionResultRead]:
-    sprint_session = db.get(SprintSession, session_id)
-    if not sprint_session:
-        raise HTTPException(status_code=404, detail="Session not found")
+def get_session_results(
+    sprint_session: SprintSession = Depends(visible_session),
+    db: Session = Depends(get_session),
+) -> List[SessionResultRead]:
     participants = db.exec(
-        select(SessionParticipant).where(SessionParticipant.session_id == session_id)
+        select(SessionParticipant).where(SessionParticipant.session_id == sprint_session.id)
     ).all()
     results: List[SessionResultRead] = []
     for participant in participants:
@@ -275,16 +289,10 @@ def ready_session(
 
 @router.post("/sessions/{session_id}/start", response_model=SessionActionResponse)
 async def start_session(
-    session_id: int,
-    current_user: User = Depends(get_current_user),
+    sprint_session: SprintSession = Depends(host_session),
     db: Session = Depends(get_session),
 ) -> SessionActionResponse:
-    try:
-        sprint_session = db.exec(select(SprintSession).where(SprintSession.id == session_id)).one()
-    except NoResultFound:
-        raise HTTPException(status_code=404, detail="Session not found")
-    if sprint_session.host_user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Only the host can start the session")
+    session_id = sprint_session.id
     if sprint_session.status != SessionStatus.waiting:
         raise HTTPException(status_code=400, detail="Session cannot be started")
     sprint_session.status = SessionStatus.live
@@ -299,16 +307,10 @@ async def start_session(
 
 @router.post("/sessions/{session_id}/end", response_model=SessionActionResponse)
 async def end_session(
-    session_id: int,
-    current_user: User = Depends(get_current_user),
+    sprint_session: SprintSession = Depends(host_session),
     db: Session = Depends(get_session),
 ) -> SessionActionResponse:
-    try:
-        sprint_session = db.exec(select(SprintSession).where(SprintSession.id == session_id)).one()
-    except NoResultFound:
-        raise HTTPException(status_code=404, detail="Session not found")
-    if sprint_session.host_user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Only the host can end the session")
+    session_id = sprint_session.id
     if sprint_session.status != SessionStatus.live:
         raise HTTPException(status_code=400, detail="Session is not live")
     sprint_session.status = SessionStatus.ended
@@ -324,19 +326,13 @@ async def end_session(
 
 @router.delete("/sessions/{session_id}", response_model=SessionActionResponse)
 def delete_session(
-    session_id: int,
-    current_user: User = Depends(get_current_user),
+    sprint_session: SprintSession = Depends(host_session),
     db: Session = Depends(get_session),
 ) -> SessionActionResponse:
     """Permanently delete a session the current user hosts, along with its
     telemetry stream and participant rows (host only), then rebuild every
     affected user's lifetime aggregates so the dashboard stays in sync."""
-    sprint_session = db.get(SprintSession, session_id)
-    if not sprint_session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    if sprint_session.host_user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Only the host can delete this session")
-
+    session_id = sprint_session.id
     participants = db.exec(
         select(SessionParticipant).where(SessionParticipant.session_id == session_id)
     ).all()
