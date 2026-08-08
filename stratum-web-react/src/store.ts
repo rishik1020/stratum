@@ -47,7 +47,6 @@ interface AppStore {
   vehicles: Vehicle[]
   currentSession: Session | null
   units: Units
-  replaySessionId: number | null
   analyticsFilter: SessionFilter
 
   setToken: (token: string) => void
@@ -55,7 +54,6 @@ interface AppStore {
   setVehicles: (vehicles: Vehicle[]) => void
   setCurrentSession: (session: Session | null) => void
   setUnits: (units: Units) => void
-  setReplaySessionId: (id: number | null) => void
   setAnalyticsFilter: (filter: SessionFilter) => void
   logout: () => void
 }
@@ -76,7 +74,6 @@ export const useAppStore = create<AppStore>((set) => ({
   vehicles: [],
   currentSession: loadSession(),
   units: (localStorage.getItem("units") as Units) || "kmh",
-  replaySessionId: null,
   analyticsFilter: "all",
 
   // setAuthToken owns both the Authorization header and localStorage, so the
@@ -96,8 +93,6 @@ export const useAppStore = create<AppStore>((set) => ({
     localStorage.setItem("units", units)
     set({ units })
   },
-
-  setReplaySessionId: (id: number | null) => set({ replaySessionId: id }),
 
   setAnalyticsFilter: (filter: SessionFilter) => set({ analyticsFilter: filter }),
 

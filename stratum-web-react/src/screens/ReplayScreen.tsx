@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react"
+import { useNavigate, useParams } from "react-router-dom"
 import { useAppStore } from "../store"
 import { sessions } from "../api"
+import { routes } from "../routes"
 import { LiveMap, MapPosition } from "../components/LiveMap"
 import { Standings } from "../components/Standings"
 import { TelemetryHUD, TelemetryFrame } from "../components/TelemetryHUD"
@@ -58,8 +60,9 @@ function sampleAt(points: SeriesPoint[], t: number): SeriesPoint | null {
 
 const SPEEDS = [1, 2, 4, 8]
 
-export const ReplayScreen = ({ onNavigate }: { onNavigate: (screen: string) => void }) => {
-  const sessionId = useAppStore((s) => s.replaySessionId)
+export const ReplayScreen = () => {
+  const navigate = useNavigate()
+  const sessionId = Number(useParams().sessionId)
   const user = useAppStore((s) => s.user)
 
   const [byRacer, setByRacer] = useState<Record<string, SeriesPoint[]>>({})
@@ -186,7 +189,7 @@ export const ReplayScreen = ({ onNavigate }: { onNavigate: (screen: string) => v
     return (
       <div className="flex flex-col items-center justify-center h-[100dvh] gap-4 px-6 text-center">
         <p className="text-white/60">{error}</p>
-        <button onClick={() => onNavigate("analytics")} className="btn-secondary">
+        <button onClick={() => navigate(routes.analytics)} className="btn-secondary">
           Back to Analytics
         </button>
       </div>
@@ -267,7 +270,7 @@ export const ReplayScreen = ({ onNavigate }: { onNavigate: (screen: string) => v
         )}
 
         <div className="px-4 pt-1 pb-[calc(env(safe-area-inset-bottom)+1.25rem)]">
-          <button onClick={() => onNavigate("analytics")} className="btn-secondary w-full flex items-center justify-center gap-2">
+          <button onClick={() => navigate(routes.analytics)} className="btn-secondary w-full flex items-center justify-center gap-2">
             <ArrowLeft size={16} />
             Done
           </button>

@@ -1,11 +1,14 @@
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { useAppStore } from "../store"
+import { routes } from "../routes"
 import { setAuthToken, auth, errorMessage } from "../api"
 import { Mail, Lock, User } from "lucide-react"
 import { Logo } from "../landing/ui"
 import { AuroraBackground } from "../landing/AuroraBackground"
 
-export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
+export const AuthScreen = () => {
+  const navigate = useNavigate()
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -31,7 +34,7 @@ export const AuthScreen = ({ onSuccess }: { onSuccess: () => void }) => {
         setAuthToken(res.data.access_token)
         setToken(res.data.access_token)
       }
-      onSuccess()
+      navigate(routes.dashboard, { replace: true })
     } catch (err: any) {
       setError(errorMessage(err, "Authentication failed"))
     } finally {

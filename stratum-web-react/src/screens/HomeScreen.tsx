@@ -1,11 +1,14 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
+import { useNavigate } from "react-router-dom"
 import { useAppStore } from "../store"
+import { routes } from "../routes"
 import { drives as drivesApi } from "../api"
 import { Plus, Users, Car, Navigation } from "lucide-react"
-import { staggerParent, staggerChild } from "../landing/ui"
+import { staggerParent, staggerChild } from "../lib/motion"
 
-export const HomeScreen = ({ onNavigate }: { onNavigate: (screen: string) => void }) => {
+export const HomeScreen = () => {
+  const navigate = useNavigate()
   const user = useAppStore((s) => s.user)
   const vehicles = useAppStore((s) => s.vehicles)
   const setAnalyticsFilter = useAppStore((s) => s.setAnalyticsFilter)
@@ -17,7 +20,7 @@ export const HomeScreen = ({ onNavigate }: { onNavigate: (screen: string) => voi
     try {
       const res = await drivesApi.start()
       setCurrentSession(res.data)
-      onNavigate("live")
+      navigate(routes.live(res.data.id))
     } catch (err) {
       console.error(err)
       setStarting(false)
@@ -27,7 +30,7 @@ export const HomeScreen = ({ onNavigate }: { onNavigate: (screen: string) => voi
   // Tapping a stat jumps to Analytics, pre-filtered (e.g. Wins → won sprints).
   const openHistory = (filter: "all" | "wins" | "podiums") => {
     setAnalyticsFilter(filter)
-    onNavigate("analytics")
+    navigate(routes.analytics)
   }
 
   // Profile and vehicles are fetched once on sign-in (see main.tsx) and live in
@@ -74,7 +77,7 @@ export const HomeScreen = ({ onNavigate }: { onNavigate: (screen: string) => voi
 
       {!hasActiveVehicle && (
         <button
-          onClick={() => onNavigate("garage")}
+          onClick={() => navigate(routes.garage)}
           className="card w-full mb-8 flex items-center justify-between border-stratum-violet/30 hover:bg-white/[0.05] transition-colors text-left"
         >
           <div className="flex items-center gap-3">
@@ -105,7 +108,7 @@ export const HomeScreen = ({ onNavigate }: { onNavigate: (screen: string) => voi
 
       <div className="grid grid-cols-2 gap-4 md:gap-6">
         <button
-          onClick={() => onNavigate("createSession")}
+          onClick={() => navigate(routes.createSession)}
           disabled={!hasActiveVehicle}
           className="card hover:bg-white/[0.05] hover:border-white/15 transition-colors h-40 md:h-48 flex flex-col justify-between group disabled:opacity-40 disabled:cursor-not-allowed text-left"
         >
@@ -117,7 +120,7 @@ export const HomeScreen = ({ onNavigate }: { onNavigate: (screen: string) => voi
         </button>
 
         <button
-          onClick={() => onNavigate("joinSession")}
+          onClick={() => navigate(routes.joinSession)}
           disabled={!hasActiveVehicle}
           className="card hover:bg-white/[0.05] hover:border-white/15 transition-colors h-40 md:h-48 flex flex-col justify-between group disabled:opacity-40 disabled:cursor-not-allowed text-left"
         >

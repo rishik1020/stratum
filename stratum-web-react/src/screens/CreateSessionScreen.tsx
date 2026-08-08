@@ -1,9 +1,12 @@
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { useAppStore } from "../store"
+import { routes } from "../routes"
 import { sessions } from "../api"
 import { ArrowLeft } from "lucide-react"
 
-export const CreateSessionScreen = ({ onNavigate }: { onNavigate: (screen: string) => void }) => {
+export const CreateSessionScreen = () => {
+  const navigate = useNavigate()
   const [name, setName] = useState("Urban Launch")
   const [maxPlayers, setMaxPlayers] = useState(6)
   const [visibility, setVisibility] = useState("private")
@@ -24,7 +27,7 @@ export const CreateSessionScreen = ({ onNavigate }: { onNavigate: (screen: strin
         visibility,
       })
       setCurrentSession(res.data)
-      onNavigate("lobby")
+      navigate(routes.lobby(res.data.id))
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to create session")
     } finally {
@@ -37,7 +40,7 @@ export const CreateSessionScreen = ({ onNavigate }: { onNavigate: (screen: strin
       <nav className="safe-top border-b border-white/[0.06]">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <button
-            onClick={() => onNavigate("home")}
+            onClick={() => navigate(routes.dashboard)}
             className="flex items-center gap-2 text-white/50 hover:text-white text-sm"
           >
             <ArrowLeft size={18} />

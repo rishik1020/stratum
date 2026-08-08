@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useAppStore } from "../store"
 import { user as userApi, vehicles as vehiclesApi } from "../api"
 import { VehicleForm, VehiclePayload } from "../components/VehicleForm"
@@ -26,7 +26,7 @@ export const GarageScreen = () => {
   const setUser = useAppStore((s) => s.setUser)
   const setStoreVehicles = useAppStore((s) => s.setVehicles)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const res = await vehiclesApi.list()
       setVehicles(res.data)
@@ -36,11 +36,11 @@ export const GarageScreen = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [setStoreVehicles])
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   const hasActive = vehicles.some((v) => v.is_active)
 

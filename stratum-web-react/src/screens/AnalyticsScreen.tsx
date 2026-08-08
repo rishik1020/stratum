@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
 import { Trash2, Play } from "lucide-react"
+import { useNavigate } from "react-router-dom"
 import { useAppStore, SessionFilter } from "../store"
+import { routes } from "../routes"
 import { user as userApi, sessions as sessionsApi } from "../api"
 import { axisProps, gridProps, RACER_PALETTE, tooltipStyle } from "../lib/charts"
 import { useUnits } from "../lib/units"
@@ -38,11 +40,11 @@ interface SeriesPoint {
   cumulative_distance_m?: number
 }
 
-export const AnalyticsScreen = ({ onNavigate }: { onNavigate?: (screen: string) => void }) => {
+export const AnalyticsScreen = () => {
+  const navigate = useNavigate()
   const { mph, speedUnit, distUnit, toSpeed, toDist } = useUnits()
   const user = useAppStore((s) => s.user)
   const setUser = useAppStore((s) => s.setUser)
-  const setReplaySessionId = useAppStore((s) => s.setReplaySessionId)
   const initialFilter = useAppStore((s) => s.analyticsFilter)
   const [sessions, setSessions] = useState<SessionSummary[]>([])
   const [trace, setTrace] = useState<SeriesPoint[]>([])
@@ -235,10 +237,7 @@ export const AnalyticsScreen = ({ onNavigate }: { onNavigate?: (screen: string) 
                     </div>
                     {s.status === "ended" && (
                       <button
-                        onClick={() => {
-                          setReplaySessionId(s.session_id)
-                          onNavigate?.("replay")
-                        }}
+                        onClick={() => navigate(routes.replay(s.session_id))}
                         title="Watch replay"
                         aria-label={`Replay ${s.name}`}
                         className="p-2 rounded-lg text-white/40 hover:text-stratum-violet hover:bg-white/[0.05] transition-colors"

@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react"
+import { useNavigate } from "react-router-dom"
 import { useAppStore } from "../store"
 import { sessions, sessionSocketUrl } from "../api"
+import { routes } from "../routes"
+import { useRouteSession } from "../lib/useRouteSession"
 import { LiveMap, MapPosition, AvatarInfo } from "../components/LiveMap"
 import { Standings } from "../components/Standings"
 import { TelemetryHUD, TelemetryFrame } from "../components/TelemetryHUD"
@@ -30,8 +33,9 @@ const distanceM = (a: GeolocationCoordinates, b: GeolocationCoordinates) => {
 
 const G = 9.80665 // m/s² — to convert accelerometer magnitude into g
 
-export const LiveScreen = ({ onNavigate }: { onNavigate: (screen: string) => void }) => {
-  const currentSession = useAppStore((s) => s.currentSession)
+export const LiveScreen = () => {
+  const navigate = useNavigate()
+  const { id: routeSessionId, session: currentSession } = useRouteSession()
   const setCurrentSession = useAppStore((s) => s.setCurrentSession)
   const user = useAppStore((s) => s.user)
   const token = useAppStore((s) => s.token)
@@ -165,7 +169,7 @@ export const LiveScreen = ({ onNavigate }: { onNavigate: (screen: string) => voi
             },
           }))
         } else if (msg.event === "session.ended") {
-          onNavigate("results")
+          navigate(routes.results(routeSessionId))
         }
       } catch {
         /* ignore malformed frames */
@@ -234,7 +238,7 @@ export const LiveScreen = ({ onNavigate }: { onNavigate: (screen: string) => voi
       await sessions.end(currentSession.id)
       // The session.ended broadcast will navigate everyone (including us),
       // but navigate directly too in case our own socket already closed.
-      onNavigate("results")
+      navigate(routes.results(currentSession.id))
     } catch (err) {
       console.error(err)
     }
@@ -252,7 +256,7 @@ export const LiveScreen = ({ onNavigate }: { onNavigate: (screen: string) => voi
       }
     }
     setCurrentSession(null)
-    onNavigate("home")
+    navigate(routes.dashboard)
   }
 
   const leaderboard = Object.values(drivers).sort((a, b) => b.distance - a.distance)

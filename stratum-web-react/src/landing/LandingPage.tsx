@@ -15,7 +15,10 @@ import { Radio, Trophy, Gauge, Play, Activity, Car, ArrowRight, ArrowDown } from
 import { AuroraBackground } from "./AuroraBackground"
 import { GlobeCanvas } from "./GlobeCanvas"
 import { useLenis } from "./useLenis"
-import { Logo, Reveal, Counter, GlowButton, staggerParent, staggerChild } from "./ui"
+import { useNavigate } from "react-router-dom"
+import { routes } from "../routes"
+import { Logo, Reveal, Counter, GlowButton } from "./ui"
+import { staggerParent, staggerChild } from "../lib/motion"
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -330,7 +333,9 @@ function Section({ children }: { children: ReactNode }) {
   return <div className="relative z-10">{children}</div>
 }
 
-export function LandingPage({ onEnter }: { onEnter: () => void }) {
+export function LandingPage() {
+  const navigate = useNavigate()
+  const onEnter = () => navigate(routes.signin)
   useLenis()
   return (
     <MotionConfig reducedMotion="user">

@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
 import { useAppStore } from "../store"
 import { sessions } from "../api"
+import { routes } from "../routes"
+import { useRouteSession } from "../lib/useRouteSession"
 import { Users, Copy, Play, RotateCcw } from "lucide-react"
 
 interface Participant {
@@ -14,8 +17,9 @@ interface Participant {
   vehicle_label?: string
 }
 
-export const LobbyScreen = ({ onNavigate }: { onNavigate: (screen: string) => void }) => {
-  const currentSession = useAppStore((s) => s.currentSession)
+export const LobbyScreen = () => {
+  const navigate = useNavigate()
+  const { id: sessionId, session: currentSession } = useRouteSession()
   const setCurrentSession = useAppStore((s) => s.setCurrentSession)
   const user = useAppStore((s) => s.user)
   const [participants, setParticipants] = useState<Participant[]>([])
@@ -32,7 +36,7 @@ export const LobbyScreen = ({ onNavigate }: { onNavigate: (screen: string) => vo
         // If the host has already started, follow everyone into the live screen.
         const detail = await sessions.getById(currentSession.id)
         if (detail.data.status === "live") {
-          onNavigate("live")
+          navigate(routes.live(sessionId))
         }
       } catch (err) {
         setError("Failed to load participants")
@@ -62,7 +66,7 @@ export const LobbyScreen = ({ onNavigate }: { onNavigate: (screen: string) => vo
     if (!currentSession) return
     try {
       await sessions.start(currentSession.id)
-      onNavigate("live")
+      navigate(routes.live(currentSession.id))
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to start session")
     }
@@ -77,7 +81,7 @@ export const LobbyScreen = ({ onNavigate }: { onNavigate: (screen: string) => vo
       }
     }
     setCurrentSession(null)
-    onNavigate("home")
+    navigate(routes.dashboard)
   }
 
   const handleCopy = () => {

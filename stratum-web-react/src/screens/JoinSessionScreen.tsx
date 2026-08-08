@@ -1,9 +1,12 @@
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { useAppStore } from "../store"
+import { routes } from "../routes"
 import { sessions } from "../api"
 import { ArrowLeft } from "lucide-react"
 
-export const JoinSessionScreen = ({ onNavigate }: { onNavigate: (screen: string) => void }) => {
+export const JoinSessionScreen = () => {
+  const navigate = useNavigate()
   const [roomCode, setRoomCode] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -24,7 +27,7 @@ export const JoinSessionScreen = ({ onNavigate }: { onNavigate: (screen: string)
       await sessions.join(roomCode)
       const sessionRes = await sessions.getByRoom(roomCode)
       setCurrentSession(sessionRes.data)
-      onNavigate("lobby")
+      navigate(routes.lobby(sessionRes.data.id))
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to join session")
     } finally {
@@ -37,7 +40,7 @@ export const JoinSessionScreen = ({ onNavigate }: { onNavigate: (screen: string)
       <nav className="safe-top border-b border-white/[0.06]">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <button
-            onClick={() => onNavigate("home")}
+            onClick={() => navigate(routes.dashboard)}
             className="flex items-center gap-2 text-white/50 hover:text-white text-sm"
           >
             <ArrowLeft size={18} />

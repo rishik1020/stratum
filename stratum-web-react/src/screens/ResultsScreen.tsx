@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { useAppStore } from "../store"
 import { sessions } from "../api"
+import { routes } from "../routes"
+import { useRouteSession } from "../lib/useRouteSession"
 import { Share2, Trophy, Play, Navigation, Trash2 } from "lucide-react"
 
 interface Result {
@@ -14,10 +17,10 @@ interface Result {
   average_speed_kmh: number
 }
 
-export const ResultsScreen = ({ onNavigate }: { onNavigate: (screen: string) => void }) => {
-  const currentSession = useAppStore((s) => s.currentSession)
+export const ResultsScreen = () => {
+  const navigate = useNavigate()
+  const { session: currentSession } = useRouteSession()
   const setCurrentSession = useAppStore((s) => s.setCurrentSession)
-  const setReplaySessionId = useAppStore((s) => s.setReplaySessionId)
   const user = useAppStore((s) => s.user)
   const [results, setResults] = useState<Result[]>([])
   const [loading, setLoading] = useState(true)
@@ -47,7 +50,7 @@ export const ResultsScreen = ({ onNavigate }: { onNavigate: (screen: string) => 
     try {
       await sessions.remove(currentSession.id)
       setCurrentSession(null)
-      onNavigate("home")
+      navigate(routes.dashboard)
     } catch (err) {
       console.error(err)
       window.alert("Could not delete it.")
@@ -68,7 +71,7 @@ export const ResultsScreen = ({ onNavigate }: { onNavigate: (screen: string) => 
 
   const handleHome = () => {
     setCurrentSession(null)
-    onNavigate("home")
+    navigate(routes.dashboard)
   }
 
   return (
@@ -125,10 +128,7 @@ export const ResultsScreen = ({ onNavigate }: { onNavigate: (screen: string) => 
               <div className="card space-y-3">
                 <button
                   onClick={() => {
-                    if (currentSession) {
-                      setReplaySessionId(currentSession.id)
-                      onNavigate("replay")
-                    }
+                    if (currentSession) navigate(routes.replay(currentSession.id))
                   }}
                   className="btn-primary w-full flex items-center justify-center gap-2"
                 >

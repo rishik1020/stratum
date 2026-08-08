@@ -1,7 +1,6 @@
 import { ReactNode, useEffect, useRef, useState } from "react"
-import { motion, useInView, animate, Variants } from "framer-motion"
-
-const EASE = [0.16, 1, 0.3, 1] as const
+import { motion, useInView, animate } from "framer-motion"
+import { EASE } from "../lib/motion"
 
 // Futuristic Stratum logo — geometric speed mark + Space Grotesk wordmark.
 export function Logo({ size = 28, withText = true, className = "" }: { size?: number; withText?: boolean; className?: string }) {
@@ -37,15 +36,6 @@ export function Reveal({ children, delay = 0, y = 24, className = "" }: { childr
       {children}
     </motion.div>
   )
-}
-
-export const staggerParent: Variants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.08 } },
-}
-export const staggerChild: Variants = {
-  hidden: { opacity: 0, y: 22 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE } },
 }
 
 // Count-up number when scrolled into view.
