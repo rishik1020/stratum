@@ -87,7 +87,7 @@
   }
 
   .btn-link {
-    @apply text-stratum-blue hover:text-stratum-blue/70 underline underline-offset-4 decoration-stratum-blue/30 transition-colors;
+    @apply text-stratum-lime hover:text-stratum-lime/70 underline underline-offset-4 decoration-stratum-lime/30 transition-colors;
   }
 
   /* Glassmorphism panel. */
@@ -101,7 +101,7 @@
 
   /* Text input field shell. */
   .field {
-    @apply flex items-center gap-2.5 bg-white/[0.03] border border-white/10 rounded-xl px-3.5 py-2.5 focus-within:border-stratum-blue/60 transition-colors;
+    @apply flex items-center gap-2.5 bg-white/[0.03] border border-white/10 rounded-xl px-3.5 py-2.5 focus-within:border-stratum-lime/60 transition-colors;
   }
 
   .panel-header {

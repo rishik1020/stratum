@@ -218,11 +218,6 @@ class TelemetrySeriesPoint(BaseModel):
     g_force: Optional[float] = None
 
 
-class WebSocketMessage(BaseModel):
-    event: str
-    payload: dict
-
-
 # --- Drive analytics & driving score (mirrors app.analytics dataclasses) ------
 class DriveMetricsSchema(BaseModel):
     point_count: int

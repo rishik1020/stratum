@@ -247,7 +247,7 @@ export const ReplayScreen = ({ onNavigate }: { onNavigate: (screen: string) => v
                 key={name}
                 onClick={() => setSelected(name)}
                 className={`text-xs px-2.5 py-1 rounded-full border shrink-0 transition-colors ${
-                  selected === name ? "bg-stratum-gold/15 text-stratum-gold border-stratum-gold/30" : "bg-white/5 text-white/55 border-white/10 hover:text-white/80"
+                  selected === name ? "bg-stratum-violet/15 text-stratum-violet border-stratum-violet/30" : "bg-white/5 text-white/55 border-white/10 hover:text-white/80"
                 }`}
               >
                 {name}

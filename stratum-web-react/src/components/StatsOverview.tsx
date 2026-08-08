@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react"
-import { useAppStore } from "../store"
 import { user as userApi } from "../api"
+import { axisProps, gridProps, SCORE_LINES, tooltipStyle, VIOLET } from "../lib/charts"
+import { fmtHours } from "../lib/format"
+import { useUnits } from "../lib/units"
 import {
   ResponsiveContainer,
   LineChart,
@@ -24,29 +26,12 @@ interface Stats {
   by_vehicle: { vehicle_id: number; label: string; drives: number; distance_m: number; top_speed_kmh: number }[]
 }
 
-const GOLD = "#8b5cf6"
-const SCORE_LINES = [
-  { key: "overall", color: "#8b5cf6" },
-  { key: "safety", color: "#a3e635" },
-  { key: "eco", color: "#34d399" },
-  { key: "comfort", color: "#c084fc" },
-  { key: "performance", color: "#d946ef" },
-]
 const RANGES = [
   { d: 7, l: "7D" },
   { d: 30, l: "30D" },
   { d: 90, l: "90D" },
   { d: 0, l: "All" },
 ]
-
-const tooltipStyle = {
-  background: "#14121f",
-  border: "1px solid rgba(255,255,255,0.12)",
-  borderRadius: 12,
-  color: "#fff",
-  fontSize: 12,
-}
-const axisProps = { stroke: "rgba(255,255,255,0.4)", tick: { fontSize: 11 } }
 
 const Delta = ({ pct }: { pct: number | null | undefined }) =>
   pct == null ? (
@@ -73,12 +58,8 @@ const Best = ({ label, value, unit }: { label: string; value: string; unit?: str
  * Reads the cheap pre-aggregated /users/me/stats snapshot.
  */
 export const StatsOverview = ({ refreshKey = 0 }: { refreshKey?: number }) => {
-  const units = useAppStore((s) => s.units)
-  const mph = units === "mph"
-  const speedUnit = mph ? "mph" : "km/h"
-  const distUnit = mph ? "mi" : "km"
-  const toSpeed = (k: number) => Math.round(mph ? k * 0.621371 : k)
-  const toDist = (m: number) => +(m / 1000 * (mph ? 0.621371 : 1)).toFixed(1)
+  const { speedUnit, distUnit, toSpeed, toDist: toDistRaw } = useUnits()
+  const toDist = (m: number) => toDistRaw(m, 1)
 
   const [days, setDays] = useState(30)
   const [stats, setStats] = useState<Stats | null>(null)
@@ -86,12 +67,6 @@ export const StatsOverview = ({ refreshKey = 0 }: { refreshKey?: number }) => {
   useEffect(() => {
     userApi.stats(days).then((r) => setStats(r.data)).catch(() => setStats(null))
   }, [days, refreshKey])
-
-  const fmtTime = (s: number) => {
-    const h = Math.floor(s / 3600)
-    const m = Math.round((s % 3600) / 60)
-    return h > 0 ? `${h}h ${m}m` : `${m}m`
-  }
 
   return (
     <div className="space-y-6">
@@ -133,7 +108,7 @@ export const StatsOverview = ({ refreshKey = 0 }: { refreshKey?: number }) => {
         </div>
         <div className="card">
           <span className="eyebrow">Active time</span>
-          <strong className="stat-num text-2xl md:text-3xl font-medium block mt-2">{fmtTime(stats?.totals.moving_time_s || 0)}</strong>
+          <strong className="stat-num text-2xl md:text-3xl font-medium block mt-2">{fmtHours(stats?.totals.moving_time_s || 0)}</strong>
           <div className="mt-1.5">
             <Delta pct={stats?.deltas.time_pct} />
           </div>
@@ -149,14 +124,14 @@ export const StatsOverview = ({ refreshKey = 0 }: { refreshKey?: number }) => {
               <AreaChart data={stats.trend.map((t) => ({ label: t.label, d: toDist(t.distance_m) }))} margin={{ top: 5, right: 6, bottom: 0, left: -24 }}>
                 <defs>
                   <linearGradient id="distFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={GOLD} stopOpacity={0.35} />
-                    <stop offset="100%" stopColor={GOLD} stopOpacity={0} />
+                    <stop offset="0%" stopColor={VIOLET} stopOpacity={0.35} />
+                    <stop offset="100%" stopColor={VIOLET} stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="label" {...axisProps} tick={{ fontSize: 10 }} />
                 <YAxis {...axisProps} width={28} />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Area type="monotone" dataKey="d" name={distUnit} stroke={GOLD} strokeWidth={2} fill="url(#distFill)" />
+                <Area type="monotone" dataKey="d" name={distUnit} stroke={VIOLET} strokeWidth={2} fill="url(#distFill)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -203,7 +178,7 @@ export const StatsOverview = ({ refreshKey = 0 }: { refreshKey?: number }) => {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={stats.score_trend} margin={{ top: 5, right: 10, bottom: 5, left: -10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                <CartesianGrid {...gridProps} />
                 <XAxis dataKey="label" {...axisProps} />
                 <YAxis {...axisProps} domain={[0, 100]} />
                 <Tooltip contentStyle={tooltipStyle} />

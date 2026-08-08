@@ -49,7 +49,7 @@ export const Layout = ({
                   onClick={() => onNavigate(item.key)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm transition-colors ${
                     active
-                      ? "bg-stratum-gold/12 text-white border border-stratum-gold/25"
+                      ? "bg-stratum-violet/12 text-white border border-stratum-violet/25"
                       : "text-white/45 border border-transparent hover:bg-white/[0.04] hover:text-white/80"
                   }`}
                 >
@@ -95,7 +95,7 @@ export const Layout = ({
                 key={item.key}
                 onClick={() => onNavigate(item.key)}
                 className={`flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${
-                  active ? "text-stratum-gold" : "text-white/45 active:text-white/80"
+                  active ? "text-stratum-violet" : "text-white/45 active:text-white/80"
                 }`}
               >
                 {item.icon}

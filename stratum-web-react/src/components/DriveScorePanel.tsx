@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
-import { useAppStore } from "../store"
 import { sessions as sessionsApi } from "../api"
+import { fmtDuration } from "../lib/format"
+import { useUnits } from "../lib/units"
 import { Shield, Leaf, Gauge, Sofa, TrendingUp, AlertTriangle, Lightbulb } from "lucide-react"
 
 interface DriveAnalytics {
@@ -37,12 +38,6 @@ interface DriveAnalytics {
 
 const scoreColor = (v: number) => (v >= 80 ? "#5cb98a" : v >= 60 ? "#cda349" : "#d97b7b")
 
-const fmtTime = (s: number) => {
-  const m = Math.floor(s / 60)
-  const sec = Math.round(s % 60)
-  return `${m}m ${sec}s`
-}
-
 const ScoreRing = ({ value }: { value: number }) => {
   const r = 52
   const c = 2 * Math.PI * r
@@ -77,15 +72,9 @@ const SubBar = ({ icon, label, value }: { icon: React.ReactNode; label: string; 
 )
 
 export const DriveScorePanel = ({ sessionId }: { sessionId: number }) => {
-  const units = useAppStore((s) => s.units)
+  const { speedUnit, distUnit, toSpeed, toDist } = useUnits()
   const [data, setData] = useState<DriveAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
-
-  const mph = units === "mph"
-  const speedUnit = mph ? "mph" : "km/h"
-  const distUnit = mph ? "mi" : "km"
-  const toSpeed = (kmh: number) => Math.round(mph ? kmh * 0.621371 : kmh)
-  const toDist = (m: number) => (m / 1000 * (mph ? 0.621371 : 1)).toFixed(2)
 
   useEffect(() => {
     setLoading(true)
@@ -122,9 +111,9 @@ export const DriveScorePanel = ({ sessionId }: { sessionId: number }) => {
         </div>
 
         <div className="col-span-2 space-y-3">
-          <SubBar icon={<Shield size={14} className="text-stratum-blue" />} label="Safety" value={score.safety} />
+          <SubBar icon={<Shield size={14} className="text-stratum-lime" />} label="Safety" value={score.safety} />
           <SubBar icon={<Leaf size={14} className="text-green-400" />} label="Eco" value={score.eco} />
-          <SubBar icon={<Gauge size={14} className="text-stratum-gold" />} label="Performance" value={score.performance} />
+          <SubBar icon={<Gauge size={14} className="text-stratum-violet" />} label="Performance" value={score.performance} />
           <SubBar icon={<Sofa size={14} className="text-pink-400" />} label="Comfort" value={score.comfort} />
         </div>
       </div>
@@ -132,8 +121,8 @@ export const DriveScorePanel = ({ sessionId }: { sessionId: number }) => {
       <div className="grid grid-cols-4 gap-3 mt-6">
         {[
           ["Distance", `${toDist(metrics.distance_m)} ${distUnit}`],
-          ["Moving", fmtTime(metrics.moving_time_s)],
-          ["Idle", fmtTime(metrics.idle_time_s)],
+          ["Moving", fmtDuration(metrics.moving_time_s)],
+          ["Idle", fmtDuration(metrics.idle_time_s)],
           ["Stops", `${metrics.stop_count}`],
           ["Avg speed", `${toSpeed(metrics.avg_speed_kmh)} ${speedUnit}`],
           ["Max speed", `${toSpeed(metrics.max_speed_kmh)} ${speedUnit}`],
@@ -179,7 +168,7 @@ export const DriveScorePanel = ({ sessionId }: { sessionId: number }) => {
           )}
         </div>
         <div>
-          <p className="text-xs font-medium text-stratum-blue mb-1 flex items-center gap-1"><Lightbulb size={12} /> Coach recommends</p>
+          <p className="text-xs font-medium text-stratum-lime mb-1 flex items-center gap-1"><Lightbulb size={12} /> Coach recommends</p>
           <ul className="space-y-1">
             {insights.recommendations.map((s, i) => (
               <li key={i} className="text-sm text-white/75">• {s}</li>

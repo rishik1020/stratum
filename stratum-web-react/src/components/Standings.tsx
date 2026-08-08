@@ -1,3 +1,4 @@
+import { initials } from "../lib/format"
 import { AvatarInfo } from "./LiveMap"
 
 export interface DriverStanding {
@@ -8,9 +9,6 @@ export interface DriverStanding {
   gapToLeaderM: number
   intervalM: number
 }
-
-const initials = (name: string) =>
-  (name || "?").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase()
 
 const Avatar = ({ info, name }: { info?: AvatarInfo; name: string }) => (
   <div className="w-8 h-8 shrink-0 rounded-full overflow-hidden border border-white/15 bg-white/5 flex items-center justify-center">
@@ -46,13 +44,13 @@ export const Standings = ({
           key={driver.user}
           className={`flex items-center gap-3 rounded-lg px-3 py-2 border ${
             driver.user === myName
-              ? "bg-stratum-blue/15 border-stratum-blue/40"
+              ? "bg-stratum-lime/15 border-stratum-lime/40"
               : "bg-white/5 border-white/8"
           }`}
         >
           <span
             className={`stat-num w-5 shrink-0 text-center font-semibold ${
-              driver.position === 1 ? "text-stratum-gold" : "text-white/40"
+              driver.position === 1 ? "text-stratum-violet" : "text-white/40"
             }`}
           >
             {driver.position}
@@ -66,7 +64,7 @@ export const Standings = ({
           </div>
           <div className="text-right shrink-0">
             {driver.position === 1 ? (
-              <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-stratum-gold">Leader</span>
+              <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-stratum-violet">Leader</span>
             ) : (
               <>
                 <strong className="stat-num block text-sm font-medium">+{driver.gapToLeaderM} m</strong>

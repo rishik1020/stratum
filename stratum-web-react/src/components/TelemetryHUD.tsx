@@ -1,4 +1,5 @@
 import { Radio } from "lucide-react"
+import { fmtClock } from "../lib/format"
 
 /**
  * One frame of telemetry to display. Phone-derived fields are populated live;
@@ -22,7 +23,7 @@ const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
 const Bar = ({ fill }: { fill: number }) => (
   <div className="h-1.5 rounded-full bg-white/[0.08] overflow-hidden">
     <div
-      className="h-full rounded-full bg-stratum-gold/80 transition-[width] duration-300 ease-out"
+      className="h-full rounded-full bg-stratum-violet/80 transition-[width] duration-300 ease-out"
       style={{ width: `${clamp01(fill) * 100}%` }}
     />
   </div>
@@ -48,12 +49,6 @@ const Gauge = ({
     {fill !== undefined ? <Bar fill={fill} /> : <div className="h-1.5 rounded-full bg-white/[0.04]" />}
   </div>
 )
-
-const fmtClock = (s: number) => {
-  const m = Math.floor(s / 60)
-  const sec = Math.floor(s % 60)
-  return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
-}
 
 /**
  * Telemetry HUD overlay — the gauge panel that sits over the live map during a
@@ -122,7 +117,7 @@ export const TelemetryHUD = ({
             max={Math.max(1, Math.floor(total))}
             value={Math.floor(elapsedS)}
             onChange={(e) => onSeek?.(Number(e.target.value))}
-            className="w-full accent-stratum-gold cursor-pointer"
+            className="w-full accent-stratum-violet cursor-pointer"
           />
         ) : (
           <div className="h-0.5 rounded-full bg-white/8 overflow-hidden">

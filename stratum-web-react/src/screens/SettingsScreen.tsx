@@ -2,12 +2,10 @@ import { useEffect, useState } from "react"
 import { Camera } from "lucide-react"
 import { useAppStore } from "../store"
 import { user as userApi } from "../api"
+import { initials } from "../lib/format"
 
 const inputClass =
   "w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-white outline-none focus:border-white/25 transition-colors placeholder:text-white/30"
-
-const initials = (name?: string) =>
-  (name || "?").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase()
 
 export const SettingsScreen = () => {
   const user = useAppStore((s) => s.user)

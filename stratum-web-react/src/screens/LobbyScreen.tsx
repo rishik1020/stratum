@@ -126,7 +126,7 @@ export const LobbyScreen = ({ onNavigate }: { onNavigate: (screen: string) => vo
                         <span className="font-medium block">
                           {p.display_name || p.username || `Player ${p.user_id}`}
                           {p.user_id === currentSession.host_user_id && (
-                            <span className="ml-2 text-[10px] uppercase tracking-[0.15em] text-stratum-gold">Host</span>
+                            <span className="ml-2 text-[10px] uppercase tracking-[0.15em] text-stratum-violet">Host</span>
                           )}
                         </span>
                         {p.vehicle_label && <span className="text-xs text-white/50">{p.vehicle_label}</span>}

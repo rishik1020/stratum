@@ -312,7 +312,7 @@ export const LiveScreen = ({ onNavigate }: { onNavigate: (screen: string) => voi
         {needsMotionPermission && (
           <button
             onClick={enableMotion}
-            className="w-full bg-stratum-gold/15 text-stratum-gold text-xs font-medium py-2 border-b border-stratum-gold/20"
+            className="w-full bg-stratum-violet/15 text-stratum-violet text-xs font-medium py-2 border-b border-stratum-violet/20"
           >
             Tap to enable G-force (motion access)
           </button>

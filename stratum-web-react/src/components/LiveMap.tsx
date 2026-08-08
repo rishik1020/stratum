@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
+import { initials } from "../lib/format"
 
 export interface MapPosition {
   lat: number
@@ -17,9 +18,6 @@ interface Tracked {
   cur: MapPosition
   target: MapPosition
 }
-
-const initials = (name: string) =>
-  (name || "?").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase()
 
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string))
@@ -45,8 +43,8 @@ const pinIcon = (name: string, info: AvatarInfo | undefined, isMe: boolean) => {
 
 /**
  * Live participant map. Each racer is a circular avatar pin (their photo, or
- * initials) with a coloured ring — gold for the current user, steel for others —
- * on a dark CARTO basemap.
+ * initials) with a coloured ring — violet for the current user, lime for
+ * everyone else — on a dark CARTO basemap.
  *
  * Pins glide between updates (eased every frame) so they don't snap on each
  * ~1 Hz GPS fix, and the map aggressively recomputes its size so it renders on

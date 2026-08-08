@@ -20,10 +20,12 @@ module.exports = {
       },
       colors: {
         // Violet → Lime fusion on near-black.
+        // (These were named -blue and -gold before a palette swap left the
+        // names pointing at the wrong colours. Named for what they are now.)
         "stratum-darker": "#0a0a12", // near-black base
         "stratum-dark": "#14121f", // elevated surface
-        "stratum-blue": "#a3e635", // lime (secondary / energy)
-        "stratum-gold": "#8b5cf6", // electric violet (primary accent)
+        "stratum-lime": "#a3e635", // lime — secondary / energy
+        "stratum-violet": "#8b5cf6", // electric violet — primary accent
       },
       backgroundImage: {
         // Near-black with a violet glow from the top and a lime glow in the corner.

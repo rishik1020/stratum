@@ -96,7 +96,7 @@ export const ResultsScreen = ({ onNavigate }: { onNavigate: (screen: string) => 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
               <div className="lg:col-span-2 card">
                 <div className="flex items-center gap-4 mb-6">
-                  {isSolo ? <Navigation size={36} className="text-stratum-gold" /> : <Trophy size={40} className="text-stratum-gold" />}
+                  {isSolo ? <Navigation size={36} className="text-stratum-violet" /> : <Trophy size={40} className="text-stratum-violet" />}
                   <div>
                     <span className="eyebrow">{isSolo ? "Your drive" : "Winner"}</span>
                     <h3 className="display text-3xl">{winner?.display_name}</h3>

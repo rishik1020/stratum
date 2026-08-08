@@ -102,7 +102,7 @@ export const GarageScreen = () => {
       </div>
 
       {!hasActive && !loading && (
-        <div className="card mb-6 border-stratum-gold/40 text-stratum-gold text-sm">
+        <div className="card mb-6 border-stratum-violet/40 text-stratum-violet text-sm">
           You need an active vehicle to create or join a sprint. Add one and set it active below.
         </div>
       )}

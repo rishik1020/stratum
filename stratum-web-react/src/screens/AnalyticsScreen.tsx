@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react"
 import { Trash2, Play } from "lucide-react"
 import { useAppStore, SessionFilter } from "../store"
 import { user as userApi, sessions as sessionsApi } from "../api"
+import { axisProps, gridProps, RACER_PALETTE, tooltipStyle } from "../lib/charts"
+import { useUnits } from "../lib/units"
 import { DriveScorePanel } from "../components/DriveScorePanel"
 import { StatsOverview } from "../components/StatsOverview"
 import {
@@ -38,24 +40,9 @@ interface SeriesPoint {
   cumulative_distance_m?: number
 }
 
-const BLUE = "#a3e635"
-const GOLD = "#8b5cf6"
-// Per-racer line colours for the multi-racer speed trace (cycled) — F1 palette.
-const PALETTE = ["#8b5cf6", "#a3e635", "#d946ef", "#c084fc", "#bef264", "#a78bfa", "#84cc16"]
-
-const tooltipStyle = {
-  background: "#14121f",
-  border: "1px solid rgba(255,255,255,0.12)",
-  borderRadius: 12,
-  color: "#fff",
-  fontSize: 12,
-}
-
-const axisProps = { stroke: "rgba(255,255,255,0.4)", tick: { fontSize: 12 } }
-
 export const AnalyticsScreen = ({ onNavigate }: { onNavigate?: (screen: string) => void }) => {
+  const { mph, speedUnit, distUnit, toSpeed, toDist } = useUnits()
   const user = useAppStore((s) => s.user)
-  const units = useAppStore((s) => s.units)
   const setUser = useAppStore((s) => s.setUser)
   const setReplaySessionId = useAppStore((s) => s.setReplaySessionId)
   const initialFilter = useAppStore((s) => s.analyticsFilter)
@@ -65,12 +52,6 @@ export const AnalyticsScreen = ({ onNavigate }: { onNavigate?: (screen: string) 
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [filter, setFilter] = useState<SessionFilter>(initialFilter)
   const [statsRefresh, setStatsRefresh] = useState(0)
-
-  const mph = units === "mph"
-  const speedUnit = mph ? "mph" : "km/h"
-  const distUnit = mph ? "mi" : "km"
-  const toSpeed = (kmh: number) => Math.round(mph ? kmh * 0.621371 : kmh)
-  const toDist = (m: number) => +(m / 1000 * (mph ? 0.621371 : 1)).toFixed(2)
 
   useEffect(() => {
     const run = async () => {
@@ -213,7 +194,7 @@ export const AnalyticsScreen = ({ onNavigate }: { onNavigate?: (screen: string) 
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={traceRows} margin={{ top: 5, right: 10, bottom: 5, left: -10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                    <CartesianGrid {...gridProps} />
                     <XAxis dataKey="t" {...axisProps} unit="s" />
                     <YAxis {...axisProps} />
                     <Tooltip contentStyle={tooltipStyle} />
@@ -224,7 +205,7 @@ export const AnalyticsScreen = ({ onNavigate }: { onNavigate?: (screen: string) 
                         type="monotone"
                         dataKey={name}
                         name={name}
-                        stroke={PALETTE[i % PALETTE.length]}
+                        stroke={RACER_PALETTE[i % RACER_PALETTE.length]}
                         strokeWidth={2}
                         dot={false}
                         connectNulls
@@ -282,7 +263,7 @@ export const AnalyticsScreen = ({ onNavigate }: { onNavigate?: (screen: string) 
                         }}
                         title="Watch replay"
                         aria-label={`Replay ${s.name}`}
-                        className="p-2 rounded-lg text-white/40 hover:text-stratum-gold hover:bg-white/[0.05] transition-colors"
+                        className="p-2 rounded-lg text-white/40 hover:text-stratum-violet hover:bg-white/[0.05] transition-colors"
                       >
                         <Play size={16} />
                       </button>
