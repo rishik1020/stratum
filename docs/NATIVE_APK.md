@@ -64,6 +64,12 @@ stratum-web-react/android/app/build/outputs/apk/debug/app-debug.apk
 > Whenever you change frontend code **or** `.env.production`, re-run steps 1–3
 > (`npm run build && npx cap copy android` then `gradlew assembleDebug`).
 
+> **Only one tunnel at a time.** `run-tunnel.cmd` points the HTTPS tunnel at the
+> *frontend* (for the phone browser); `run-tunnel-backend.cmd` points the ngrok
+> static domain at the *backend* (for the APK). The APK expects that domain to
+> be the backend — running the frontend tunnel on it breaks every installed
+> build until you switch back.
+
 ### Install on a phone
 
 - **USB (adb):** enable USB debugging, then

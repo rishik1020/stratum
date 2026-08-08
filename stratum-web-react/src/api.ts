@@ -29,6 +29,31 @@ export const api = axios.create({
   },
 })
 
+// Called when the server rejects our token. Registered by the store (which
+// can't be imported here — it imports this module).
+let onUnauthorized: (() => void) | null = null
+export const setUnauthorizedHandler = (fn: () => void) => {
+  onUnauthorized = fn
+}
+
+// A stored token that the server no longer accepts — expired, or the account is
+// gone — used to leave the app wedged: every request failed, the errors were
+// swallowed, and the user sat on a "Loading…" screen forever with no way out
+// short of clearing site data. Treat it as a sign-out instead.
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status
+    const url: string = error?.config?.url ?? ""
+    // /auth/login answers 401 for a wrong password — that's a failed sign-in
+    // attempt, not an expired session, and must not trigger a sign-out.
+    if (status === 401 && !url.startsWith("/auth/")) {
+      onUnauthorized?.()
+    }
+    return Promise.reject(error)
+  }
+)
+
 // Turn an axios error into a message a driver can act on — distinguishing
 // "can't reach the server" (backend/tunnel down) from a real API rejection.
 export const errorMessage = (err: any, fallback = "Something went wrong"): string => {

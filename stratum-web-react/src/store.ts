@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import { setAuthToken } from "./api"
+import { setAuthToken, setUnauthorizedHandler } from "./api"
 
 interface User {
   id: number
@@ -111,3 +111,9 @@ export const useAppStore = create<AppStore>((set) => ({
     set({ token: null, user: null, vehicles: [], currentSession: null })
   },
 }))
+
+// A rejected token signs the user out, which drops them back to the landing
+// page via the route guards rather than stranding them on a loading screen.
+setUnauthorizedHandler(() => {
+  if (useAppStore.getState().token) useAppStore.getState().logout()
+})

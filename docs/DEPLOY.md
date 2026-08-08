@@ -8,28 +8,24 @@ Everything in the codebase is already prepared for this:
 - `backend/app/database.py` uses `DATABASE_URL` (Postgres) when present, SQLite otherwise.
 - `backend/requirements.txt` includes the Postgres driver.
 - `backend/render.yaml` provisions the web service **and** the database.
+- `backend/migrations/` runs on startup, against Postgres as well as SQLite.
 - CORS already allows the Capacitor app origins (`https://localhost`, `capacitor://localhost`).
 
 ---
 
-## Step 1 — Put the project on GitHub (one-time)
+## Step 1 — Push to GitHub (one-time)
 
-Render deploys from a Git repo, and this project isn't one yet.
+Render deploys from a Git repo. This project is already a local repo with a
+`.gitignore` that keeps the tunnel binaries, `node_modules`, build output and
+the local database out of history — so you only need a remote:
 
 ```bash
 cd "Stratum"
-git init
-git add .
-git commit -m "Stratum: native app + deploy-ready backend"
 # create an empty repo on github.com first, then:
 git remote add origin https://github.com/<you>/stratum.git
 git branch -M main
 git push -u origin main
 ```
-
-> `cloudflared.exe` and `ngrok.exe` are large (~90 MB total). Add a `.gitignore`
-> for them and `node_modules`, `dist`, `android/`, `ios/build/`, `*.db` before the
-> first commit to keep the repo lean. (Ask me and I'll generate the `.gitignore`.)
 
 ## Step 2 — Deploy on Render
 
@@ -76,3 +72,34 @@ PC or tunnel running.
   in-memory room manager means **one instance only** — don't scale to 2+ workers
   without moving rooms to Redis.
 - **HTTPS is automatic** on Render, so `wss://` live telemetry works out of the box.
+- **Set `STRATUM_SECRET_KEY`.** The blueprint generates one. Without it the app
+  falls back to a known dev key and logs a warning — anyone could forge a token.
+
+---
+
+## Schema changes
+
+Migrations run automatically at startup (`create_db_and_tables` → `alembic
+upgrade head`), so a deploy applies them with no extra step.
+
+To add one after changing `models.py`:
+
+```bash
+cd backend
+python -m alembic revision --autogenerate -m "what changed"
+# read the generated file in migrations/versions/ before committing it
+python -m alembic upgrade head    # applies locally; the deploy does its own
+```
+
+Two things autogenerate gets wrong here, both worth checking:
+
+- **`user` ↔ `vehicle` is a foreign-key cycle** (`user.active_vehicle_id` and
+  `vehicle.user_id`). Autogenerate will happily emit a `CREATE TABLE user` that
+  references `vehicle` before it exists. SQLite allows it; Postgres rejects it.
+  See `0001_baseline.py` for the shape that works.
+- **SQLite can't `ALTER` most things in place.** `render_as_batch` is on in
+  `migrations/env.py`, which rebuilds the table instead — keep it.
+
+A database created before Alembic existed (tables present, no `alembic_version`)
+is stamped at the baseline on first startup and carried forward from there, so
+adopting migrations doesn't recreate anything.

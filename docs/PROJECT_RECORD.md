@@ -4,6 +4,11 @@
 > tech stack, how the backend and frontend work, the live-telemetry and replay
 > pipelines, the networking/tunnel setup, the build timeline, and how to run and
 > inspect it. Read top-to-bottom or jump via the contents.
+>
+> **For the current shape of the code, the README is the live reference.** This
+> document also carries history — §13 is a build timeline and §16 records the
+> cleanup pass, both of which describe how things got here rather than how they
+> are now.
 
 ## Contents
 1. What Stratum is
@@ -21,6 +26,7 @@
 13. Build timeline (what we did, in order)
 14. Known limitations & the path to production / app stores
 15. File map
+16. The cleanup pass
 
 ---
 
@@ -101,16 +107,26 @@ destroyed.
 ```
 backend/
   app/
-    main.py        # FastAPI app, all routes, WebSocket endpoint, lifespan
+    main.py        # app assembly only — CORS, lifespan, router registration
+    routers/       # one module per resource
+      auth.py      #   /auth/signup, /auth/login
+      users.py     #   /users/me, history, aggregate stats
+      vehicles.py  #   the garage
+      sessions.py  #   sprints + solo drives: create, lobby, start, end, results
+      telemetry.py #   stored series, drive analytics, the live WebSocket
+    services.py    # domain rules — score rollup, room codes, abandoned-drive sweep
+    deps.py        # authorization: who may read which session
     models.py      # SQLModel tables
     schemas.py     # Pydantic request/response models
     auth.py        # JWT + password hashing
-    database.py    # engine, table creation, lightweight column migration
+    database.py    # engine + startup migration
     analytics.py   # pure drive-metrics + scoring + coach engine
     ws_manager.py  # in-memory WebSocket room manager
-  tests/test_analytics.py
+  migrations/      # Alembic; runs on startup, SQLite and Postgres alike
+  tests/           # test_analytics, test_api_auth, test_sessions
+  run_tests.py     # runs them all — no pytest required
   snapshot.py      # read-only DB snapshot tool
-  app.db           # SQLite database (auto-created)
+  app.db           # SQLite database (auto-created, gitignored)
   requirements.txt
 ```
 
@@ -205,15 +221,23 @@ stratum-web-react/src/
 ```
 
 ### Navigation
-`main.tsx` keeps the current screen in React state (no router). Hub screens
-(Dashboard / Garage / Analytics / Settings) render inside `Layout`; session and
-replay screens render full-screen. A subtle opacity fade plays on each change.
+`App.tsx` defines real routes (react-router, hash mode) with lazy-loaded screens.
+Hub screens (Dashboard / Garage / Analytics / Settings) render inside `Layout`;
+session and replay screens render full-screen. A subtle opacity fade plays on
+each change.
+
+Session screens take their identity from the URL — `/sessions/:id/replay` — so
+links are shareable and a refresh keeps you where you were. `useRouteSession`
+fetches the session when the store is cold, which is what makes a cold deep link
+work. Hash routing (not history) is deliberate: the same build is served by Vite,
+a static host and the Capacitor WebView, and hash routes need no server rewrite
+in any of them.
 
 ### State (`store.ts`)
-Zustand store holds: `token`, `user`, `vehicles`, `activeVehicle`,
-`currentSession`, `units` (km/h or mph), `replaySessionId`, and `analyticsFilter`
-(`all | wins | podiums`). Token + current session + units persist to
-`localStorage`.
+Zustand store holds: `token`, `user`, `vehicles`, `currentSession`, `units`
+(km/h or mph), and `analyticsFilter` (`all | wins | podiums`). Token + current
+session + units persist to `localStorage`. `setAuthToken` in `api.ts` is the
+single writer for the token — it owns both the axios header and storage.
 
 ### Screen flow
 ```
@@ -230,12 +254,18 @@ Auth → Dashboard → Garage (add + activate a vehicle)
 
 ## 7. Design system (minimal / premium)
 
-Chosen direction: calm, editorial, restrained — not neon/gamer.
+Original direction was calm and editorial (brass + steel on near-black). It was
+later swapped to a **violet → lime** fusion, which is what ships today.
 
-- **Palette** (`tailwind.config.js`): near-black background `#0b0b0c`, elevated
-  surfaces `#161618`, a single muted brass accent `#cda349` (`stratum-gold`) and a
-  muted steel `#7aa2cc` (`stratum-blue`) for data. White text via opacity.
-- **Type:** serif display headings (`.display`), uppercase tracked labels
+- **Palette** (`tailwind.config.js`): near-black base `#0a0a12` (`stratum-darker`),
+  elevated surface `#14121f` (`stratum-dark`), electric violet `#8b5cf6`
+  (`stratum-violet`, primary accent) and lime `#a3e635` (`stratum-lime`,
+  secondary/energy). White text via opacity.
+- **Naming caution:** those two tokens were called `stratum-gold` and
+  `stratum-blue` until the cleanup pass. The palette swap had changed the values
+  and left the names behind, so every usage read as the opposite of what it
+  rendered. They are now named for the colour they actually are.
+- **Type:** Space Grotesk display headings (`.display`), uppercase tracked labels
   (`.eyebrow`), tabular mono numerals (`.stat-num`).
 - **Components** (`index.css`): flat glassy `.card`, near-white pill `.btn-primary`,
   subtle `.btn-secondary`, unified `.field` inputs.
@@ -319,7 +349,7 @@ Windows scripts (double-click), in the project root:
 |---|---|
 | `run-all.cmd` | Start backend + frontend (each in its own window) |
 | `run-backend.cmd` | Backend only → http://127.0.0.1:8000 |
-| `run-frontend.cmd` | Frontend only → http://127.0.0.1:5173 |
+| `run-frontend.cmd` | Frontend only → http://127.0.0.1:3000 |
 | `run-tunnel.cmd` | Cloudflare quick tunnel (random HTTPS URL) |
 | `run-tunnel-stable.cmd` | ngrok stable tunnel (same URL every time) |
 | `db-snapshot.cmd` | Print a DB summary |
@@ -327,7 +357,7 @@ Windows scripts (double-click), in the project root:
 Manual:
 ```bat
 cd backend && python -m uvicorn app.main:app --reload --port 8000
-cd stratum-web-react && npm run dev -- --port 5173
+cd stratum-web-react && npm run dev
 ```
 
 Phone testing: start the app, run a tunnel script, open the printed HTTPS URL on
@@ -423,23 +453,69 @@ Stratum/
     ANALYTICS_ARCHITECTURE.md  # original staff-level design + 14-feature roadmap
     PROJECT_RECORD.md          # this document
   backend/
-    app/{main,models,schemas,auth,database,analytics,ws_manager}.py
-    tests/test_analytics.py
+    app/{main,models,schemas,auth,database,deps,services,analytics,ws_manager}.py
+    app/routers/{auth,users,vehicles,sessions,telemetry}.py
+    migrations/versions/*.py
+    tests/{test_analytics,test_api_auth,test_sessions}.py
+    run_tests.py
     snapshot.py
-    app.db
-    requirements.txt
+    app.db                       (gitignored)
+    requirements.txt, requirements-dev.txt, alembic.ini
     README.md
   stratum-web-react/
-    src/{main.tsx, store.ts, api.ts, index.css}
-    src/components/{Layout, LiveMap, TelemetryHUD, Standings, DriveScorePanel, VehicleForm}.tsx
+    src/{main.tsx, App.tsx, routes.ts, store.ts, api.ts, native.ts, index.css}
+    src/lib/{units, format, charts, motion, useRouteSession, useSessionSocket}.ts
+    src/components/{Layout, LiveMap, TelemetryHUD, Standings, StatsOverview,
+                    DriveScorePanel, VehicleForm}.tsx
     src/screens/{Auth, Home, Garage, Analytics, Settings, CreateSession,
                  JoinSession, Lobby, Live, Results, Replay}.tsx
-    vite.config.ts, tailwind.config.js, package.json
+    src/landing/{LandingPage, GlobeCanvas, AuroraBackground, ui, useLenis}
+    vite.config.ts, tailwind.config.js, package.json, .eslintrc.cjs
     README.md
 ```
 
 ---
 
-*This record reflects the state of the project as built during the development
-sessions. For the original design rationale and the longer feature roadmap, see
+## 16. The cleanup pass
+
+A dedicated pass over the whole codebase after the feature work settled. What it
+changed, and why each mattered:
+
+**Security.** Five session endpoints had no authentication at all — including
+`/sessions/{id}/telemetry`, which returns raw GPS breadcrumbs tagged with
+usernames. Anyone who could reach the backend could walk the integer ID space
+and reconstruct where real people drove. The WebSocket checked the token but
+never membership, so any signed-in user could tune into a stranger's live feed.
+All of it is now scoped to people who actually raced, and non-participants get
+404 rather than 403 so IDs can't be enumerated.
+
+**Correctness.** A dead socket aborted the broadcast loop and silenced every
+racer behind it. Leaving a session was permanent — rejoining hit "already
+joined" without clearing `left_at`, leaving the racer invisible. Abandoned
+drives stayed `live` forever. `activeVehicle` in the store was written by a
+setter nothing called, so it was permanently null. Both "Leave" buttons
+navigated away without calling the leave endpoint, which had no caller anywhere.
+
+**Migrations.** `database.py` patched columns with `PRAGMA table_info` and
+returned early on anything that wasn't SQLite — so any column added after the
+first deploy silently never reached the production Postgres. Replaced with
+Alembic, which adopts existing databases by stamping them at a baseline.
+
+**Structure.** `main.py` was 769 lines holding every route; it's 45 now, with
+routers, services and deps split out. The frontend's `useState<string>` screen
+switch became real routes, which brought deep links, browser back, and
+lazy-loading that cut the initial bundle from 298 kB to 122 kB gzipped.
+
+**Waste.** The lobby polled two endpoints every 2 s and the live screen polled
+the roster every 10 s — over a WebSocket that was already open. Both now listen
+for a pushed `roster.changed`. Helpers duplicated across three files moved to
+`src/lib`. ~90 MB of committed binaries left the repo.
+
+**Workflow.** The frontend port disagreed with itself across four files, and two
+tunnel scripts bound the same ngrok domain to different ports — running the
+wrong one silently broke every installed APK.
+
+---
+
+*For the original design rationale and the longer feature roadmap, see
 [ANALYTICS_ARCHITECTURE.md](ANALYTICS_ARCHITECTURE.md).*

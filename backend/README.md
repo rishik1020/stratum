@@ -1,6 +1,7 @@
-# Stratum Backend MVP
+# Stratum Backend
 
-This backend is built with FastAPI and SQLite for the first web MVP of Stratum.
+FastAPI + SQLModel. SQLite locally, Postgres in the cloud (`DATABASE_URL`).
+See the [root README](../README.md) for the module layout.
 
 ## Install dependencies
 
@@ -27,7 +28,19 @@ cd backend
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+The database is created and migrated automatically on startup.
+
+## Tests
+
+```bash
+python run_tests.py
+```
+
 ## API Notes
+
+Full interactive reference at `/docs` once running. The reads below are scoped
+to participants — a valid token isn't enough, you have to have been in the
+session (see `app/deps.py`).
 
 - `POST /auth/signup` to create a user
 - `POST /auth/login` to get a JWT token
@@ -63,6 +76,9 @@ the database to Postgres (see `docs/ANALYTICS_ARCHITECTURE.md`).
 
 ## Next steps
 
-- Add persistent session state in Redis
-- Add invite link and lobby participant queries
-- Add frontend integration for live telemetry
+- Move WebSocket rooms to Redis pub/sub so the API can run more than one
+  instance (the current room manager is in-memory, so it can't)
+- Map-match real road speed limits — the Safety score currently penalises
+  against a flat 120 km/h placeholder (`analytics.DEFAULT_SPEED_LIMIT_KMH`),
+  which never triggers in town
+- Upgrade off SQLModel 0.0.8, which pins the app to Pydantic v1
