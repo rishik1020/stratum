@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAppStore } from "../store"
-import { sessions, sessionSocketUrl } from "../api"
+import { sessions } from "../api"
 import { routes } from "../routes"
 import { useRouteSession } from "../lib/useRouteSession"
+import { SessionEvent, useSessionSocket } from "../lib/useSessionSocket"
 import { LiveMap, MapPosition, AvatarInfo } from "../components/LiveMap"
 import { Standings } from "../components/Standings"
 import { TelemetryHUD, TelemetryFrame } from "../components/TelemetryHUD"
@@ -38,10 +39,8 @@ export const LiveScreen = () => {
   const { id: routeSessionId, session: currentSession } = useRouteSession()
   const setCurrentSession = useAppStore((s) => s.setCurrentSession)
   const user = useAppStore((s) => s.user)
-  const token = useAppStore((s) => s.token)
 
   const [elapsedTime, setElapsedTime] = useState(0)
-  const [connected, setConnected] = useState(false)
   const [geoError, setGeoError] = useState("")
   const [mySpeed, setMySpeed] = useState(0)
   const [myDistance, setMyDistance] = useState(0)
@@ -55,7 +54,6 @@ export const LiveScreen = () => {
   const [showBoard, setShowBoard] = useState(true)
   const [roster, setRoster] = useState<Record<string, { displayName: string; avatarUrl?: string | null }>>({})
 
-  const socketRef = useRef<WebSocket | null>(null)
   const lastCoordRef = useRef<GeolocationCoordinates | null>(null)
   const cumulativeRef = useRef(0)
   const topSpeedRef = useRef(0)
@@ -117,65 +115,53 @@ export const LiveScreen = () => {
   }, [])
 
   // Roster: participant display names + avatars, keyed by username (telemetry is
-  // keyed by username too). Re-fetched a few times to catch late joiners.
-  useEffect(() => {
-    if (!currentSession) return
-    let cancelled = false
-    const load = () => {
-      sessions
-        .participants(currentSession.id)
-        .then((res) => {
-          if (cancelled) return
-          const next: Record<string, { displayName: string; avatarUrl?: string | null }> = {}
-          for (const p of res.data as Array<{ username?: string; display_name?: string; profile_picture_url?: string | null }>) {
-            if (p.username) next[p.username] = { displayName: p.display_name || p.username, avatarUrl: p.profile_picture_url }
-          }
-          setRoster(next)
-        })
-        .catch(() => {})
-    }
-    load()
-    const interval = setInterval(load, 10000)
-    return () => {
-      cancelled = true
-      clearInterval(interval)
-    }
-  }, [currentSession?.id])
-
-  // WebSocket + geolocation telemetry.
-  useEffect(() => {
-    if (!currentSession || !token) return
-
-    const socket = new WebSocket(sessionSocketUrl(currentSession.id, token))
-    socketRef.current = socket
-
-    socket.onopen = () => setConnected(true)
-    socket.onclose = () => setConnected(false)
-    socket.onerror = () => setConnected(false)
-
-    socket.onmessage = (evt) => {
-      try {
-        const msg = JSON.parse(evt.data)
-        if (msg.event === "telemetry.update") {
-          const { user: who, speed_kmh, cumulative_distance_m, latitude, longitude } = msg.payload
-          setDrivers((prev) => ({
-            ...prev,
-            [who]: {
-              user: who,
-              speed: Math.round(speed_kmh ?? 0),
-              distance: Math.round(cumulative_distance_m ?? prev[who]?.distance ?? 0),
-              lat: latitude ?? prev[who]?.lat,
-              lng: longitude ?? prev[who]?.lng,
-            },
-          }))
-        } else if (msg.event === "session.ended") {
-          navigate(routes.results(routeSessionId))
+  // keyed by username too). Loaded on arrival, then refreshed only when the
+  // server says the roster changed — it used to re-poll every 10 seconds.
+  const loadRoster = useCallback(() => {
+    if (!routeSessionId) return
+    sessions
+      .participants(routeSessionId)
+      .then((res) => {
+        const next: Record<string, { displayName: string; avatarUrl?: string | null }> = {}
+        for (const p of res.data as Array<{ username?: string; display_name?: string; profile_picture_url?: string | null }>) {
+          if (p.username) next[p.username] = { displayName: p.display_name || p.username, avatarUrl: p.profile_picture_url }
         }
-      } catch {
-        /* ignore malformed frames */
-      }
-    }
+        setRoster(next)
+      })
+      .catch(() => {})
+  }, [routeSessionId])
 
+  useEffect(() => {
+    loadRoster()
+  }, [loadRoster])
+
+  const handleEvent = useCallback(
+    (msg: SessionEvent) => {
+      if (msg.event === "telemetry.update") {
+        const { user: who, speed_kmh, cumulative_distance_m, latitude, longitude } = msg.payload
+        setDrivers((prev) => ({
+          ...prev,
+          [who]: {
+            user: who,
+            speed: Math.round(speed_kmh ?? 0),
+            distance: Math.round(cumulative_distance_m ?? prev[who]?.distance ?? 0),
+            lat: latitude ?? prev[who]?.lat,
+            lng: longitude ?? prev[who]?.lng,
+          },
+        }))
+      } else if (msg.event === "roster.changed") {
+        loadRoster()
+      } else if (msg.event === "session.ended") {
+        navigate(routes.results(routeSessionId))
+      }
+    },
+    [loadRoster, navigate, routeSessionId]
+  )
+
+  const { connected, send } = useSessionSocket(routeSessionId, handleEvent)
+
+  // Geolocation → telemetry frames on the shared socket.
+  useEffect(() => {
     let watchId: number | null = null
     if ("geolocation" in navigator) {
       watchId = navigator.geolocation.watchPosition(
@@ -199,24 +185,20 @@ export const LiveScreen = () => {
             setTopSpeed(Math.round(speedKmh))
           }
 
-          if (socket.readyState === WebSocket.OPEN) {
-            socket.send(
-              JSON.stringify({
-                event: "telemetry.update",
-                payload: {
-                  latitude: coords.latitude,
-                  longitude: coords.longitude,
-                  speed_kmh: speedKmh,
-                  heading_deg: coords.heading,
-                  distance_delta_m: delta,
-                  cumulative_distance_m: cumulativeRef.current,
-                  accuracy_m: coords.accuracy,
-                  altitude_m: coords.altitude,
-                  g_force: gForceRef.current || null,
-                },
-              })
-            )
-          }
+          send({
+            event: "telemetry.update",
+            payload: {
+              latitude: coords.latitude,
+              longitude: coords.longitude,
+              speed_kmh: speedKmh,
+              heading_deg: coords.heading,
+              distance_delta_m: delta,
+              cumulative_distance_m: cumulativeRef.current,
+              accuracy_m: coords.accuracy,
+              altitude_m: coords.altitude,
+              g_force: gForceRef.current || null,
+            },
+          })
         },
         (err) => setGeoError(err.message || "Location unavailable"),
         { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
@@ -227,10 +209,8 @@ export const LiveScreen = () => {
 
     return () => {
       if (watchId != null) navigator.geolocation.clearWatch(watchId)
-      socket.close()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentSession?.id, token])
+  }, [send])
 
   const handleEnd = async () => {
     if (!currentSession) return

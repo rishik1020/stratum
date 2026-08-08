@@ -42,6 +42,16 @@ from app.ws_manager import manager
 router = APIRouter(tags=["sessions"])
 
 
+async def _announce_roster(session_id: int) -> None:
+    """Tell everyone in the room that the participant list changed.
+
+    Deliberately a bare signal rather than the roster itself: clients re-read
+    /participants, so the API stays the single source of truth and we don't
+    maintain a second serialization of the same rows in the socket layer.
+    """
+    await manager.broadcast(str(session_id), {"event": "roster.changed", "payload": {"session_id": session_id}})
+
+
 # --- Creating ----------------------------------------------------------------
 
 
@@ -212,7 +222,7 @@ def get_session_results(
 
 
 @router.post("/sessions/join", response_model=SessionActionResponse)
-def join_session(
+async def join_session(
     data: JoinSessionSchema,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_session),
@@ -241,6 +251,7 @@ def join_session(
         participant_exists.ready = False
         db.add(participant_exists)
         db.commit()
+        await _announce_roster(sprint_session.id)
         return SessionActionResponse(success=True, message="Rejoined session")
     if sprint_session.status != SessionStatus.waiting:
         raise HTTPException(status_code=400, detail="Session already started or ended")
@@ -255,11 +266,12 @@ def join_session(
         )
     )
     db.commit()
+    await _announce_roster(sprint_session.id)
     return SessionActionResponse(success=True, message="Joined session")
 
 
 @router.post("/sessions/{session_id}/leave", response_model=SessionActionResponse)
-def leave_session(
+async def leave_session(
     session_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_session),
@@ -275,11 +287,12 @@ def leave_session(
     participant.left_at = datetime.utcnow()
     db.add(participant)
     db.commit()
+    await _announce_roster(session_id)
     return SessionActionResponse(success=True, message="Left session")
 
 
 @router.post("/sessions/{session_id}/ready", response_model=SessionActionResponse)
-def ready_session(
+async def ready_session(
     session_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_session),
@@ -295,6 +308,7 @@ def ready_session(
     participant.ready = True
     db.add(participant)
     db.commit()
+    await _announce_roster(session_id)
     return SessionActionResponse(success=True, message="Ready status updated")
 
 

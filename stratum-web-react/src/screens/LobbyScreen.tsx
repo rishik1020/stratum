@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react"
+import { useCallback, useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAppStore } from "../store"
 import { sessions } from "../api"
 import { routes } from "../routes"
 import { useRouteSession } from "../lib/useRouteSession"
-import { Users, Copy, Play, RotateCcw } from "lucide-react"
+import { SessionEvent, useSessionSocket } from "../lib/useSessionSocket"
+import { Users, Copy, Play, RotateCcw, Wifi, WifiOff } from "lucide-react"
 
 interface Participant {
   id: number
@@ -27,37 +28,47 @@ export const LobbyScreen = () => {
   const [error, setError] = useState("")
   const [copied, setCopied] = useState(false)
 
-  useEffect(() => {
-    if (!currentSession) return
-    const loadParticipants = async () => {
-      try {
-        const res = await sessions.participants(currentSession.id)
-        setParticipants(res.data)
-        // If the host has already started, follow everyone into the live screen.
-        const detail = await sessions.getById(currentSession.id)
-        if (detail.data.status === "live") {
-          navigate(routes.live(sessionId))
-        }
-      } catch (err) {
-        setError("Failed to load participants")
-      } finally {
-        setLoading(false)
-      }
+  const loadParticipants = useCallback(async () => {
+    if (!sessionId) return
+    try {
+      const res = await sessions.participants(sessionId)
+      setParticipants(res.data)
+    } catch {
+      setError("Failed to load participants")
+    } finally {
+      setLoading(false)
     }
+  }, [sessionId])
+
+  // Read the roster once on arrival; after that the server tells us when it
+  // changes. This used to re-poll /participants *and* /sessions/{id} every two
+  // seconds over a socket that was already open.
+  useEffect(() => {
     loadParticipants()
-    const interval = setInterval(loadParticipants, 2000)
-    return () => clearInterval(interval)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentSession])
+  }, [loadParticipants])
+
+  const handleEvent = useCallback(
+    (msg: SessionEvent) => {
+      if (msg.event === "roster.changed" || msg.event === "participant.ready") {
+        loadParticipants()
+      } else if (msg.event === "session.started") {
+        // The host launched — everyone follows into the live screen.
+        navigate(routes.live(sessionId))
+      }
+    },
+    [loadParticipants, navigate, sessionId]
+  )
+
+  const { connected } = useSessionSocket(sessionId, handleEvent)
 
   const handleReady = async () => {
     if (!currentSession) return
     try {
       await sessions.ready(currentSession.id)
-      // Re-fetch instead of reloading the page (a reload would wipe in-memory state).
-      const res = await sessions.participants(currentSession.id)
-      setParticipants(res.data)
-    } catch (err) {
+      // The broadcast refreshes everyone including us, but update locally too in
+      // case our own socket is down — the button should still feel like it worked.
+      loadParticipants()
+    } catch {
       setError("Failed to mark ready")
     }
   }
@@ -98,7 +109,22 @@ export const LobbyScreen = () => {
       <nav className="safe-top border-b border-white/[0.06]">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
-            <h1 className="font-medium text-xl">Lobby</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="font-medium text-xl">Lobby</h1>
+              {/* Without polling, a dropped socket means a silently stale
+                  roster — so say so rather than showing stale data as fresh. */}
+              {connected ? (
+                <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-emerald-400/80">
+                  <Wifi size={13} />
+                  Live
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-white/40">
+                  <WifiOff size={13} />
+                  Reconnecting
+                </span>
+              )}
+            </div>
             <button onClick={handleLeave} className="btn-secondary">
               Leave
             </button>

@@ -163,6 +163,31 @@ def test_a_drive_still_being_driven_is_left_alone():
         assert db.get(SprintSession, drive_id).status == SessionStatus.live
 
 
+# --- roster push -------------------------------------------------------------
+
+
+def test_joining_pushes_a_roster_change_to_everyone_in_the_room():
+    """The lobby stopped polling, so this push is the only thing that tells an
+    already-connected racer that someone new walked in."""
+    session_id, room_code = new_race("Push race")
+    with client.websocket_connect(f"/ws/sessions/{session_id}?token={HOST}") as ws:
+        ws.receive_json()  # our own participant.joined on connect
+
+        client.post("/sessions/join", headers=bearer(RACER), json={"room_code": room_code})
+
+        seen = [ws.receive_json()["event"] for _ in range(1)]
+        assert "roster.changed" in seen, f"expected a roster.changed push, got {seen}"
+
+
+def test_marking_ready_pushes_a_roster_change():
+    session_id, room_code = new_race("Ready race")
+    client.post("/sessions/join", headers=bearer(RACER), json={"room_code": room_code})
+    with client.websocket_connect(f"/ws/sessions/{session_id}?token={HOST}") as ws:
+        ws.receive_json()  # participant.joined
+        client.post(f"/sessions/{session_id}/ready", headers=bearer(RACER))
+        assert ws.receive_json()["event"] == "roster.changed"
+
+
 # --- broadcast resilience ----------------------------------------------------
 
 
