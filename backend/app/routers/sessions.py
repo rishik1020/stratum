@@ -31,6 +31,7 @@ from app.schemas import (
     SessionResultRead,
 )
 from app.services import (
+    close_abandoned_sessions,
     finalize_session_stats,
     generate_room_code,
     recompute_user_stats,
@@ -52,6 +53,7 @@ def create_session(
 ) -> SprintSession:
     if not current_user.active_vehicle_id:
         raise HTTPException(status_code=400, detail="Add and activate a vehicle before creating a session")
+    close_abandoned_sessions(current_user.id, db)
     sprint_session = SprintSession(
         host_user_id=current_user.id,
         name=data.name,
@@ -85,6 +87,7 @@ def start_solo_drive(
     with no opponents or lobby."""
     if not current_user.active_vehicle_id:
         raise HTTPException(status_code=400, detail="Add and activate a vehicle before starting a drive")
+    close_abandoned_sessions(current_user.id, db)
     drive = SprintSession(
         host_user_id=current_user.id,
         name="Solo drive",
@@ -227,7 +230,18 @@ def join_session(
         )
     ).first()
     if participant_exists:
-        return SessionActionResponse(success=True, message="Already joined")
+        if participant_exists.left_at is None:
+            return SessionActionResponse(success=True, message="Already joined")
+        # They left and came back. Without clearing the tombstone they'd be told
+        # "already joined" while staying invisible in /participants forever,
+        # since that view filters on left_at IS NULL.
+        if sprint_session.status == SessionStatus.ended:
+            raise HTTPException(status_code=400, detail="That session has already finished")
+        participant_exists.left_at = None
+        participant_exists.ready = False
+        db.add(participant_exists)
+        db.commit()
+        return SessionActionResponse(success=True, message="Rejoined session")
     if sprint_session.status != SessionStatus.waiting:
         raise HTTPException(status_code=400, detail="Session already started or ended")
     if not current_user.active_vehicle_id:

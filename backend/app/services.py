@@ -5,6 +5,7 @@ code is minted — rather than how HTTP is spoken. Routers stay thin; this is
 where the rules live.
 """
 import random
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import HTTPException
@@ -19,6 +20,11 @@ from app.models import (
     User,
     Vehicle,
 )
+
+
+# A live drive whose telemetry went quiet this long ago wasn't being driven —
+# the app was closed, the phone died, or the browser tab went away.
+ABANDONED_AFTER = timedelta(minutes=30)
 
 
 def vehicle_label(vehicle: Optional[Vehicle]) -> Optional[str]:
@@ -85,6 +91,46 @@ def finalize_session_stats(session_id: int, db: Session) -> None:
             db.add(user)
         db.add(participant)
     db.commit()
+
+
+def close_abandoned_sessions(user_id: int, db: Session) -> int:
+    """End any of this user's live sessions that were clearly abandoned.
+
+    Nothing ends a drive if the app is killed mid-race, so without this a
+    forgotten session stays `live` forever — it never gets scored, never shows
+    up in history, and quietly rots. We sweep when the user starts something
+    new, which is the natural moment to notice the old one is dead, and backdate
+    `ended_at` to the last real telemetry rather than to now.
+
+    Returns how many were closed.
+    """
+    now = datetime.utcnow()
+    live_sessions = db.exec(
+        select(SprintSession).where(
+            SprintSession.host_user_id == user_id,
+            SprintSession.status == SessionStatus.live,
+        )
+    ).all()
+
+    closed = 0
+    for sprint_session in live_sessions:
+        last_point = db.exec(
+            select(TelemetryPoint)
+            .where(TelemetryPoint.session_id == sprint_session.id)
+            .order_by(TelemetryPoint.timestamp.desc())
+        ).first()
+        last_seen = last_point.timestamp if last_point else (
+            sprint_session.started_at or sprint_session.created_at
+        )
+        if now - last_seen < ABANDONED_AFTER:
+            continue  # still being driven — leave it alone
+        sprint_session.status = SessionStatus.ended
+        sprint_session.ended_at = last_seen
+        db.add(sprint_session)
+        db.commit()
+        finalize_session_stats(sprint_session.id, db)
+        closed += 1
+    return closed
 
 
 def recompute_user_stats(user_id: int, db: Session) -> None:
