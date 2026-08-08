@@ -1,0 +1,56 @@
+# ── Tunnel binaries ───────────────────────────────────────────────────────
+# Kept on disk (run-tunnel*.cmd uses them) but never committed — ~90 MB.
+# Download: https://ngrok.com/download · https://github.com/cloudflare/cloudflared/releases
+ngrok.exe
+cloudflared.exe
+ngrok.yml
+
+# ── Python ────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ── Database ──────────────────────────────────────────────────────────────
+# Local dev DB, created automatically on first backend start.
+*.db
+*.db-journal
+*.sqlite3
+
+# ── Node / frontend ───────────────────────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# ── Capacitor / native builds ─────────────────────────────────────────────
+# The native projects ARE committed; their build output and machine-specific
+# config are not.
+stratum-web-react/android/build/
+stratum-web-react/android/app/build/
+stratum-web-react/android/.gradle/
+stratum-web-react/android/local.properties
+stratum-web-react/android/app/src/main/assets/public/
+stratum-web-react/ios/App/build/
+stratum-web-react/ios/App/Pods/
+stratum-web-react/ios/App/App/public/
+*.apk
+*.aab
+*.keystore
+
+# ── Secrets ───────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Generated analysis artifacts ──────────────────────────────────────────
+graphify-out/
+
+# ── Editor / OS ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,29 @@
+# Render Blueprint — one-click provision of the Stratum backend + Postgres.
+# In Render: New + → "Blueprint" → connect the repo → it reads this file.
+services:
+  - type: web
+    name: stratum-api
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /docs
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      # Strong JWT secret — Render generates a random value for you.
+      - key: STRATUM_SECRET_KEY
+        generateValue: true
+      # Wire the managed Postgres connection string in automatically.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: stratum-db
+          property: connectionString
+      # Leave STRATUM_ALLOWED_ORIGINS unset so the built-in regex keeps allowing
+      # the Capacitor app origins (https://localhost, capacitor://localhost).
+
+databases:
+  - name: stratum-db
+    plan: free
+    databaseName: stratum

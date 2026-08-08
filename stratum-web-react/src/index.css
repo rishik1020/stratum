@@ -1,0 +1,261 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Safe-area insets exposed as variables (0 on browsers without notches).
+       Requires viewport-fit=cover in index.html. */
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+  }
+
+  html,
+  body {
+    /* Full native height; dvh tracks the real viewport as browser chrome hides. */
+    min-height: 100dvh;
+  }
+
+  body {
+    @apply bg-stratum-darker text-white/90 font-sans antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    /* Never allow sideways scroll / off-screen clipping on mobile. */
+    overflow-x: hidden;
+    /* Respect side insets in landscape / curved-edge phones. */
+    padding-left: var(--safe-left);
+    padding-right: var(--safe-right);
+  }
+
+  /* Larger, comfortable touch targets on coarse pointers (phones). */
+  @media (pointer: coarse) {
+    button,
+    a,
+    input,
+    select,
+    [role="button"] {
+      touch-action: manipulation;
+    }
+  }
+
+  /* Tighter tracking on headings reads more refined than default. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer components {
+  /* Futuristic display heading — Space Grotesk, used for hero/page titles. */
+  .display {
+    @apply font-display font-bold tracking-tight leading-[1.05];
+  }
+
+  /* Small uppercase section label. */
+  .eyebrow {
+    @apply text-[11px] font-medium uppercase tracking-[0.16em] text-white/40;
+  }
+
+  /* Tabular monospace for telemetry/stat numerals. */
+  .stat-num {
+    @apply font-mono tabular-nums tracking-tight;
+  }
+
+  /* Lime pill primary action with a soft lime glow. */
+  .btn-primary {
+    @apply px-5 py-2.5 rounded-full font-semibold text-sm transition-shadow disabled:opacity-50;
+    background: #c6f24e;
+    color: #0a0a12;
+    box-shadow: 0 8px 26px rgba(163, 230, 53, 0.24);
+  }
+  .btn-primary:hover {
+    box-shadow: 0 10px 34px rgba(163, 230, 53, 0.4);
+  }
+
+  .btn-secondary {
+    @apply px-5 py-2.5 rounded-xl font-medium text-sm text-white/90 transition-colors;
+    background: rgba(255, 255, 255, 0.04);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.09);
+  }
+
+  .btn-link {
+    @apply text-stratum-blue hover:text-stratum-blue/70 underline underline-offset-4 decoration-stratum-blue/30 transition-colors;
+  }
+
+  /* Glassmorphism panel. */
+  .card {
+    @apply rounded-2xl p-5 md:p-6 overflow-hidden;
+    background: rgba(255, 255, 255, 0.035);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  /* Text input field shell. */
+  .field {
+    @apply flex items-center gap-2.5 bg-white/[0.03] border border-white/10 rounded-xl px-3.5 py-2.5 focus-within:border-stratum-blue/60 transition-colors;
+  }
+
+  .panel-header {
+    @apply flex justify-between items-center mb-4 font-semibold;
+  }
+
+  /* Safe-area helpers — pad content clear of the status bar / gesture bar so the
+     edge-to-edge WebView never hides UI behind system chrome. */
+  .safe-top {
+    padding-top: var(--safe-top);
+  }
+  .safe-bottom {
+    padding-bottom: var(--safe-bottom);
+  }
+  /* Add the top inset ON TOP of an existing padding value via margin. */
+  .pt-safe {
+    padding-top: calc(var(--safe-top) + 0.75rem);
+  }
+  .pb-safe {
+    padding-bottom: calc(var(--safe-bottom) + 0.75rem);
+  }
+}
+
+/* Lenis smooth scroll */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+/* Subtle fade when switching screens — keep it opacity-only (no transform) so
+   it never creates a containing block for the full-screen map/HUD overlays. */
+@keyframes stratumFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.fade-in {
+  animation: stratumFade 0.2s ease-out both;
+}
+
+/* Smoother momentum scrolling + no tap-highlight flash on touch. */
+html {
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+}
+
+/* ===== Futuristic UI system (landing + app restyle) ===== */
+.font-display {
+  font-family: "Space Grotesk", "Inter", sans-serif;
+  letter-spacing: -0.01em;
+}
+.font-anton {
+  font-family: "Anton", "Space Grotesk", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.005em;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.035);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.glass-strong {
+  background: rgba(18, 18, 26, 0.62);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.text-gradient {
+  background-image: linear-gradient(110deg, #c4b5fd 0%, #a855f7 32%, #a3e635 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.bg-gradient-lv {
+  background-image: linear-gradient(115deg, #a855f7, #8b5cf6 45%, #a3e635);
+}
+
+.mesh-dots {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.09) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
+
+@keyframes auroraA {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(8%, -6%) scale(1.15); }
+}
+@keyframes auroraB {
+  0%, 100% { transform: translate(0, 0) scale(1.1); }
+  50% { transform: translate(-10%, 8%) scale(1); }
+}
+@keyframes auroraC {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(6%, 10%) scale(1.2); }
+}
+.aurora-a { animation: auroraA 18s ease-in-out infinite; }
+.aurora-b { animation: auroraB 23s ease-in-out infinite; }
+.aurora-c { animation: auroraC 28s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-a, .aurora-b, .aurora-c { animation: none; }
+}
+
+/* Leaflet live-map theming (global — Leaflet injects its own DOM). */
+.stratum-map-label.leaflet-tooltip {
+  background: rgba(11, 11, 12, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 6px;
+  box-shadow: none;
+}
+.stratum-map-label.leaflet-tooltip-top::before {
+  border-top-color: rgba(11, 11, 12, 0.85);
+}
+.leaflet-container {
+  background: #0a0a12;
+  font-family: inherit;
+}
+
+/* Avatar map pins (Leaflet divIcon) — circular photo/initials with a coloured ring. */
+.stratum-pin {
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  overflow: hidden;
+  border: 2px solid #a3e635;
+  background: #14121f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+}
+.stratum-pin.me {
+  border-color: #8b5cf6;
+}
+.stratum-pin img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.stratum-pin span {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
