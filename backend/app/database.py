@@ -1,6 +1,10 @@
+import logging
 import os
 
-from sqlmodel import create_engine, Session, SQLModel
+from sqlalchemy import inspect
+from sqlmodel import create_engine, Session
+
+logger = logging.getLogger("stratum.db")
 
 # Use the host's managed database in the cloud (DATABASE_URL), else local SQLite
 # for dev. Render/Heroku hand out "postgres://" URLs; SQLAlchemy needs the
@@ -19,38 +23,39 @@ if IS_SQLITE:
 else:
     engine = create_engine(DATABASE_URL, echo=False, pool_pre_ping=True, pool_recycle=300)
 
-# Nullable columns added after the table first shipped. SQLModel's create_all
-# only creates missing *tables*, not missing *columns*, so we add these by hand
-# on an existing DB rather than wiping it. Idempotent: skipped if already present.
-_ADDED_COLUMNS = {
-    "telemetrypoint": [("altitude_m", "FLOAT"), ("g_force", "FLOAT")],
-    "session": [("is_solo", "BOOLEAN DEFAULT 0")],
-    "sessionparticipant": [
-        ("overall_score", "INTEGER"),
-        ("safety_score", "INTEGER"),
-        ("eco_score", "INTEGER"),
-        ("comfort_score", "INTEGER"),
-        ("performance_score", "INTEGER"),
-    ],
-}
+def _alembic_config():
+    """Alembic config pointed at backend/migrations, wherever we're launched from."""
+    from alembic.config import Config
 
-
-def _ensure_columns() -> None:
-    # PRAGMA table_info is SQLite-specific. This exists only to patch legacy local
-    # app.db files; a fresh Postgres gets every column from create_all, so skip it.
-    if not IS_SQLITE:
-        return
-    with engine.begin() as conn:
-        for table, columns in _ADDED_COLUMNS.items():
-            existing = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")}
-            for name, ddl in columns:
-                if name not in existing:
-                    conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    cfg = Config(os.path.join(backend_dir, "alembic.ini"))
+    cfg.set_main_option("script_location", os.path.join(backend_dir, "migrations"))
+    return cfg
 
 
 def create_db_and_tables() -> None:
-    SQLModel.metadata.create_all(engine)
-    _ensure_columns()
+    """Bring the database up to the latest schema.
+
+    Replaces the old create_all + hand-written ALTER TABLE patching, which only
+    ever ran on SQLite — meaning any column added after the first deploy would
+    silently never reach the production Postgres.
+
+    Databases that predate Alembic already have the tables but no
+    alembic_version, so running the baseline against them would fail on
+    "table already exists". Those get stamped at the baseline instead, then
+    carried forward by the later revisions like everyone else.
+    """
+    from alembic import command
+
+    cfg = _alembic_config()
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+
+    if "user" in tables and "alembic_version" not in tables:
+        logger.info("existing pre-Alembic database detected — stamping at baseline")
+        command.stamp(cfg, "0001_baseline")
+
+    command.upgrade(cfg, "head")
 
 
 def get_session():

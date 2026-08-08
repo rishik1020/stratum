@@ -106,8 +106,10 @@ class SessionParticipant(SQLModel, table=True):
 
 class TelemetryPoint(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    session_id: int = Field(foreign_key="session.id")
-    participant_id: int = Field(foreign_key="sessionparticipant.id")
+    # Indexed: this table grows a row per GPS fix, and both of these are the
+    # filter for a hot read (replay by session, end-of-race rollup by racer).
+    session_id: int = Field(foreign_key="session.id", index=True)
+    participant_id: int = Field(foreign_key="sessionparticipant.id", index=True)
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     latitude: float
     longitude: float
