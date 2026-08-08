@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { setAuthToken } from "./api"
 
 interface User {
   id: number
@@ -44,7 +45,6 @@ interface AppStore {
   token: string | null
   user: User | null
   vehicles: Vehicle[]
-  activeVehicle: Vehicle | null
   currentSession: Session | null
   units: Units
   replaySessionId: number | null
@@ -53,7 +53,6 @@ interface AppStore {
   setToken: (token: string) => void
   setUser: (user: User) => void
   setVehicles: (vehicles: Vehicle[]) => void
-  setActiveVehicle: (vehicle: Vehicle) => void
   setCurrentSession: (session: Session | null) => void
   setUnits: (units: Units) => void
   setReplaySessionId: (id: number | null) => void
@@ -75,26 +74,23 @@ export const useAppStore = create<AppStore>((set) => ({
   token: localStorage.getItem("token"),
   user: null,
   vehicles: [],
-  activeVehicle: null,
   currentSession: loadSession(),
   units: (localStorage.getItem("units") as Units) || "kmh",
   replaySessionId: null,
   analyticsFilter: "all",
 
+  // setAuthToken owns both the Authorization header and localStorage, so the
+  // token has exactly one writer. Previously the store and api.ts each wrote
+  // localStorage, and logging out cleared storage while leaving the header set
+  // on the axios instance for the rest of the page's life.
   setToken: (token: string) => {
-    localStorage.setItem("token", token)
+    setAuthToken(token)
     set({ token })
   },
 
   setUser: (user: User) => set({ user }),
 
-  setVehicles: (vehicles: Vehicle[]) => {
-    set({ vehicles })
-    const active = vehicles.find((v) => v.is_active)
-    if (active) set({ activeVehicle: active })
-  },
-
-  setActiveVehicle: (vehicle: Vehicle) => set({ activeVehicle: vehicle }),
+  setVehicles: (vehicles: Vehicle[]) => set({ vehicles }),
 
   setUnits: (units: Units) => {
     localStorage.setItem("units", units)
@@ -115,8 +111,8 @@ export const useAppStore = create<AppStore>((set) => ({
   },
 
   logout: () => {
-    localStorage.removeItem("token")
+    setAuthToken("")
     localStorage.removeItem("currentSession")
-    set({ token: null, user: null, currentSession: null })
+    set({ token: null, user: null, vehicles: [], currentSession: null })
   },
 }))

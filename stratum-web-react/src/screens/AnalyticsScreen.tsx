@@ -10,8 +10,6 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -79,22 +77,6 @@ export const AnalyticsScreen = ({ onNavigate }: { onNavigate?: (screen: string) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Per-session trend (chronological).
-  const trend = useMemo(() => {
-    return sessions
-      .filter((s) => s.status === "ended")
-      .slice()
-      .reverse()
-      .map((s, i) => ({
-        label: s.name.length > 10 ? s.name.slice(0, 10) + "…" : s.name || `#${i + 1}`,
-        top: toSpeed(s.top_speed_kmh),
-        avg: toSpeed(s.average_speed_kmh),
-        distance: toDist(s.total_distance_m),
-        rank: s.final_rank ?? 0,
-      }))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessions, mph])
-
   // Speed trace for the latest sprint, pivoted so every racer is one line:
   // rows are keyed by whole-second elapsed time with a speed column per racer.
   const { traceRows, racers } = useMemo(() => {
@@ -115,10 +97,6 @@ export const AnalyticsScreen = ({ onNavigate }: { onNavigate?: (screen: string) 
     return { traceRows: rows, racers: ordered }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trace, user?.username, mph])
-
-  // Finishing position over time (only ranked sprints). Lower is better, so the
-  // chart's Y axis is reversed to put P1 at the top.
-  const positions = useMemo(() => trend.filter((s) => s.rank > 0), [trend])
 
   // Wins/podiums are races only — solo drives are always "1st" and don't count.
   const podiums = sessions.filter((s) => (s.final_rank ?? 99) <= 3 && s.status === "ended" && !s.is_solo).length

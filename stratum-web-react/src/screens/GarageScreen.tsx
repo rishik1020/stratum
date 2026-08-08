@@ -24,12 +24,13 @@ export const GarageScreen = () => {
   const [confirmId, setConfirmId] = useState<number | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const setUser = useAppStore((s) => s.setUser)
+  const setStoreVehicles = useAppStore((s) => s.setVehicles)
 
   const load = async () => {
     try {
       const res = await vehiclesApi.list()
       setVehicles(res.data)
-      useAppStore.setState({ vehicles: res.data })
+      setStoreVehicles(res.data)
     } catch (err) {
       console.error(err)
     } finally {

@@ -91,6 +91,7 @@ export const sessions = {
   getById: (id: number) => api.get(`/sessions/${id}`),
   getByRoom: (roomCode: string) => api.get(`/sessions/room/${roomCode}`),
   join: (roomCode: string) => api.post("/sessions/join", { room_code: roomCode }),
+  leave: (id: number) => api.post(`/sessions/${id}/leave`),
   ready: (id: number) => api.post(`/sessions/${id}/ready`),
   start: (id: number) => api.post(`/sessions/${id}/start`),
   end: (id: number) => api.post(`/sessions/${id}/end`),

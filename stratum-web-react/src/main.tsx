@@ -38,7 +38,7 @@ function App() {
   useEffect(() => {
     if (!token) return
     userApi.getProfile().then((res) => setUser(res.data)).catch(() => {})
-    vehiclesApi.list().then((res) => useAppStore.setState({ vehicles: res.data })).catch(() => {})
+    vehiclesApi.list().then((res) => useAppStore.getState().setVehicles(res.data)).catch(() => {})
   }, [token, setUser])
 
   // Android hardware back button → in-app navigation (registered once; reads the

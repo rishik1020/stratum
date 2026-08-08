@@ -16,6 +16,7 @@ interface Participant {
 
 export const LobbyScreen = ({ onNavigate }: { onNavigate: (screen: string) => void }) => {
   const currentSession = useAppStore((s) => s.currentSession)
+  const setCurrentSession = useAppStore((s) => s.setCurrentSession)
   const user = useAppStore((s) => s.user)
   const [participants, setParticipants] = useState<Participant[]>([])
   const [loading, setLoading] = useState(true)
@@ -67,6 +68,18 @@ export const LobbyScreen = ({ onNavigate }: { onNavigate: (screen: string) => vo
     }
   }
 
+  const handleLeave = async () => {
+    if (currentSession) {
+      try {
+        await sessions.leave(currentSession.id)
+      } catch (err) {
+        console.error(err)
+      }
+    }
+    setCurrentSession(null)
+    onNavigate("home")
+  }
+
   const handleCopy = () => {
     navigator.clipboard.writeText(currentSession?.room_code || "")
     setCopied(true)
@@ -82,10 +95,7 @@ export const LobbyScreen = ({ onNavigate }: { onNavigate: (screen: string) => vo
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
             <h1 className="font-medium text-xl">Lobby</h1>
-            <button
-              onClick={() => onNavigate("home")}
-              className="btn-secondary"
-            >
+            <button onClick={handleLeave} className="btn-secondary">
               Leave
             </button>
           </div>

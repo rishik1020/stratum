@@ -1,15 +1,13 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { motion } from "framer-motion"
 import { useAppStore } from "../store"
-import { user as userApi, vehicles as vehiclesApi, drives as drivesApi } from "../api"
+import { drives as drivesApi } from "../api"
 import { Plus, Users, Car, Navigation } from "lucide-react"
 import { staggerParent, staggerChild } from "../landing/ui"
 
 export const HomeScreen = ({ onNavigate }: { onNavigate: (screen: string) => void }) => {
-  const [loading, setLoading] = useState(!useAppStore.getState().user)
   const user = useAppStore((s) => s.user)
   const vehicles = useAppStore((s) => s.vehicles)
-  const setUser = useAppStore((s) => s.setUser)
   const setAnalyticsFilter = useAppStore((s) => s.setAnalyticsFilter)
   const setCurrentSession = useAppStore((s) => s.setCurrentSession)
   const [starting, setStarting] = useState(false)
@@ -32,26 +30,12 @@ export const HomeScreen = ({ onNavigate }: { onNavigate: (screen: string) => voi
     onNavigate("analytics")
   }
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const res = await userApi.getProfile()
-        setUser(res.data)
-        const vehiclesRes = await vehiclesApi.list()
-        useAppStore.setState({ vehicles: vehiclesRes.data })
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    loadData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
+  // Profile and vehicles are fetched once on sign-in (see main.tsx) and live in
+  // the store — this screen just reads them rather than re-fetching the same two
+  // endpoints on every mount.
   const hasActiveVehicle = vehicles.some((v) => v.is_active)
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+  if (!user) return <div className="flex items-center justify-center min-h-screen">Loading…</div>
 
   const statCard = "card text-left transition-colors hover:bg-white/[0.05] hover:border-white/15 active:bg-white/[0.07]"
 

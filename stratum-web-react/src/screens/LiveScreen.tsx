@@ -32,6 +32,7 @@ const G = 9.80665 // m/s² — to convert accelerometer magnitude into g
 
 export const LiveScreen = ({ onNavigate }: { onNavigate: (screen: string) => void }) => {
   const currentSession = useAppStore((s) => s.currentSession)
+  const setCurrentSession = useAppStore((s) => s.setCurrentSession)
   const user = useAppStore((s) => s.user)
   const token = useAppStore((s) => s.token)
 
@@ -239,6 +240,21 @@ export const LiveScreen = ({ onNavigate }: { onNavigate: (screen: string) => voi
     }
   }
 
+  // Actually leave the session, not just navigate away from it. Without the
+  // call the racer stays in the participant list and keeps getting ranked at
+  // the finish on whatever distance they'd covered.
+  const handleLeave = async () => {
+    if (currentSession) {
+      try {
+        await sessions.leave(currentSession.id)
+      } catch (err) {
+        console.error(err)
+      }
+    }
+    setCurrentSession(null)
+    onNavigate("home")
+  }
+
   const leaderboard = Object.values(drivers).sort((a, b) => b.distance - a.distance)
   const leaderDistance = leaderboard[0]?.distance ?? 0
   const myName = user?.username
@@ -353,7 +369,7 @@ export const LiveScreen = ({ onNavigate }: { onNavigate: (screen: string) => voi
             </button>
           ) : (
             <>
-              <button onClick={() => onNavigate("home")} className="btn-secondary flex-1">
+              <button onClick={handleLeave} className="btn-secondary flex-1">
                 Leave
               </button>
               {isHost && (

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { useAppStore } from "../store"
 import { sessions } from "../api"
 import { LiveMap, MapPosition } from "../components/LiveMap"
