@@ -1,0 +1,11 @@
+# Development-only extras. NOT installed on the host — requirements.txt is what
+# Render's build command reads, and it should stay lean.
+#
+#   pip install -r requirements-dev.txt
+
+-r requirements.txt
+
+# The test suite runs without pytest (python run_tests.py); this is for people
+# who'd rather have -k filtering, fixtures and better failure output.
+pytest==8.3.3
+httpx==0.27.2

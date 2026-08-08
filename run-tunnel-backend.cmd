@@ -14,7 +14,7 @@ REM   1. Start the backend:  run-backend.cmd
 REM   2. Double-click this file.
 REM   3. Launch the Stratum app on your phone (from anywhere — mobile data OK).
 
-REM >>> Same static domain as before, now bound to the backend port <<<
+REM >>> Must match VITE_API_BASE_URL in stratum-web-react\.env.production <<<
 set NGROK_DOMAIN=autism-henna-sanitary.ngrok-free.dev
 
 cd /d "%~dp0"
