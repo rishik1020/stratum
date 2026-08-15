@@ -5,7 +5,6 @@ import { routes } from "../routes"
 import { setAuthToken, auth, errorMessage } from "../api"
 import { Mail, Lock, User } from "lucide-react"
 import { Logo } from "../landing/ui"
-import { AuroraBackground } from "../landing/AuroraBackground"
 
 export const AuthScreen = () => {
   const navigate = useNavigate()
@@ -44,7 +43,7 @@ export const AuthScreen = () => {
 
   return (
     <div className="relative min-h-[100dvh] bg-ink flex items-center justify-center px-4 pt-[calc(env(safe-area-inset-top)+1rem)] pb-[calc(env(safe-area-inset-bottom)+1rem)]">
-      <AuroraBackground />
+      <div className="mesh-dots pointer-events-none absolute inset-0 opacity-40" />
       <div className="card relative z-10 w-full max-w-md">
         <div className="text-center mb-8">
           <div className="mb-4 flex justify-center">

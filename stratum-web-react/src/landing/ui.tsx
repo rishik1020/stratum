@@ -9,9 +9,9 @@ export function Logo({ size = 28, withText = true, className = "" }: { size?: nu
       <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden>
         <defs>
           <linearGradient id="lg" x1="0" y1="0" x2="32" y2="32">
-            <stop stopColor="#c084fc" />
-            <stop offset="0.5" stopColor="#8b5cf6" />
-            <stop offset="1" stopColor="#a3e635" />
+            <stop stopColor="#FFC65C" />
+            <stop offset="0.55" stopColor="#FFB020" />
+            <stop offset="1" stopColor="#C77F00" />
           </linearGradient>
         </defs>
         <rect x="1.2" y="1.2" width="29.6" height="29.6" rx="8.5" stroke="url(#lg)" strokeWidth="1.6" />
@@ -57,7 +57,7 @@ export function Counter({ to, decimals = 0, suffix = "", prefix = "", className 
   )
 }
 
-// Gradient glow CTA.
+// The landing page's amber CTA.
 export function GlowButton({ children, onClick, variant = "primary", className = "" }: { children: ReactNode; onClick?: () => void; variant?: "primary" | "ghost"; className?: string }) {
   if (variant === "ghost") {
     return (
@@ -65,7 +65,7 @@ export function GlowButton({ children, onClick, variant = "primary", className =
         onClick={onClick}
         whileHover={{ y: -2 }}
         whileTap={{ scale: 0.97 }}
-        className={`glass rounded-xl px-5 py-2.5 text-sm font-medium text-white/90 transition-colors hover:bg-white/[0.08] ${className}`}
+        className={`rounded-pill border border-hairline bg-ink-2 px-5 py-2.5 text-sm font-medium text-white/90 transition-colors hover:bg-ink-3 ${className}`}
       >
         {children}
       </motion.button>
@@ -74,12 +74,11 @@ export function GlowButton({ children, onClick, variant = "primary", className =
   return (
     <motion.button
       onClick={onClick}
-      whileHover={{ y: -2, boxShadow: "0 12px 44px rgba(163,230,53,0.5)" }}
+      whileHover={{ y: -2, boxShadow: "0 12px 44px rgba(255,176,32,0.45)" }}
       whileTap={{ scale: 0.97 }}
-      className={`inline-flex items-center gap-2 rounded-full bg-[#c6f24e] px-5 py-2.5 text-sm font-semibold text-[#0a0a12] shadow-[0_8px_30px_rgba(163,230,53,0.35)] ${className}`}
+      className={`inline-flex items-center gap-2 rounded-pill bg-amber px-5 py-2.5 text-sm font-semibold text-amber-ink shadow-[0_8px_30px_rgba(255,176,32,0.3)] ${className}`}
     >
       {children}
-      <span className="h-1.5 w-1.5 rounded-full bg-[#0a0a12]" />
     </motion.button>
   )
 }
