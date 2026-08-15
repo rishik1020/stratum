@@ -1,7 +1,14 @@
 import { useEffect, useRef } from "react"
 
-// A slowly-rotating dotted globe with glowing race arcs. Self-contained canvas
-// (own rAF), dpr-aware, reduced-motion safe.
+const AMBER = "255,176,32"
+
+/**
+ * A slowly-rotating particle globe with glowing route arcs.
+ *
+ * Hollow rather than solid: the far-side dots are drawn too, just dimmer, so
+ * the sphere reads as a cloud of points you can see through. Self-contained
+ * canvas (own rAF), dpr-aware, reduced-motion safe.
+ */
 export function GlobeCanvas({ className = "" }: { className?: string }) {
   const ref = useRef<HTMLCanvasElement>(null)
 
@@ -30,17 +37,28 @@ export function GlobeCanvas({ className = "" }: { className?: string }) {
     const ro = new ResizeObserver(resize)
     ro.observe(cv)
 
+    // Even-ish point distribution: sample longitude density by latitude so the
+    // poles don't bunch up into a bright cap.
     const pts: { lat: number; lng: number }[] = []
-    for (let la = -78; la <= 78; la += 12) for (let lo = 0; lo < 360; lo += 12) pts.push({ lat: (la * Math.PI) / 180, lng: (lo * Math.PI) / 180 })
+    for (let la = -80; la <= 80; la += 8) {
+      const latRad = (la * Math.PI) / 180
+      const ring = Math.max(6, Math.round(44 * Math.cos(latRad)))
+      for (let i = 0; i < ring; i++) {
+        pts.push({ lat: latRad, lng: (i / ring) * Math.PI * 2 })
+      }
+    }
 
-    // Race arcs as start/end lat-lng pairs.
+    // Route arcs as start/end lat-lng pairs.
     const arcs = [
       [40, -3, 35, 139],
       [-23, -46, 1, 103],
       [51, 0, -33, 151],
       [34, -118, 48, 2],
       [25, 55, -1, 36],
-    ].map(([a, b, c, d]) => ({ s: { lat: (a * Math.PI) / 180, lng: (b * Math.PI) / 180 }, e: { lat: (c * Math.PI) / 180, lng: (d * Math.PI) / 180 } }))
+    ].map(([a, b, c, d]) => ({
+      s: { lat: (a * Math.PI) / 180, lng: (b * Math.PI) / 180 },
+      e: { lat: (c * Math.PI) / 180, lng: (d * Math.PI) / 180 },
+    }))
 
     const project = (lat: number, lng: number, rot: number, R: number, cx: number, cy: number) => {
       const x = Math.cos(lat) * Math.sin(lng + rot)
@@ -49,50 +67,46 @@ export function GlobeCanvas({ className = "" }: { className?: string }) {
       return { sx: cx + x * R, sy: cy - y * R, z }
     }
 
-    const draw = () => {
+    const render = () => {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, w, h)
       const cx = w / 2
       const cy = h / 2
-      const R = (Math.min(w, h) / 2) * 0.8
-      const rot = t * 0.22
+      const R = (Math.min(w, h) / 2) * 0.76
+      const rot = t * 0.18
 
-      // Outer glow
-      const glow = ctx.createRadialGradient(cx, cy, R * 0.2, cx, cy, R * 1.5)
-      glow.addColorStop(0, "rgba(139,92,246,0.28)")
-      glow.addColorStop(0.55, "rgba(139,92,246,0.07)")
+      // Ambient glow behind the sphere.
+      const glow = ctx.createRadialGradient(cx, cy, R * 0.3, cx, cy, R * 1.6)
+      glow.addColorStop(0, `rgba(${AMBER},0.16)`)
+      glow.addColorStop(0.5, `rgba(${AMBER},0.05)`)
       glow.addColorStop(1, "transparent")
       ctx.fillStyle = glow
       ctx.beginPath()
-      ctx.arc(cx, cy, R * 1.5, 0, Math.PI * 2)
+      ctx.arc(cx, cy, R * 1.6, 0, Math.PI * 2)
       ctx.fill()
 
-      // Sphere body
-      const body = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.35, R * 0.1, cx, cy, R)
-      body.addColorStop(0, "#1b1436")
-      body.addColorStop(1, "#0b0915")
-      ctx.fillStyle = body
-      ctx.beginPath()
-      ctx.arc(cx, cy, R, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.strokeStyle = "rgba(163,230,53,0.35)"
-      ctx.lineWidth = 1.5
+      // Particle shell. Far-side points are drawn first and faintly, so the
+      // globe reads as see-through instead of as a filled ball.
+      for (const p of pts) {
+        const { sx, sy, z } = project(p.lat, p.lng, rot, R, cx, cy)
+        const front = z >= 0
+        const depth = (z + 1) / 2
+        const alpha = front ? 0.25 + depth * 0.65 : 0.08 + depth * 0.12
+        const size = front ? 0.5 + depth * 1.1 : 0.5
+        ctx.fillStyle = `rgba(${AMBER},${alpha})`
+        ctx.beginPath()
+        ctx.arc(sx, sy, size, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
+      // Horizon ring — a thin bright edge that sells the sphere's silhouette.
+      ctx.strokeStyle = `rgba(${AMBER},0.30)`
+      ctx.lineWidth = 1
       ctx.beginPath()
       ctx.arc(cx, cy, R, 0, Math.PI * 2)
       ctx.stroke()
 
-      // Surface dots
-      for (const p of pts) {
-        const { sx, sy, z } = project(p.lat, p.lng, rot, R, cx, cy)
-        if (z < -0.1) continue
-        const a = (z + 1) / 2
-        ctx.fillStyle = `rgba(196,181,253,${a * 0.5})`
-        ctx.beginPath()
-        ctx.arc(sx, sy, a * 1.3 + 0.3, 0, Math.PI * 2)
-        ctx.fill()
-      }
-
-      // Race arcs
+      // Route arcs with a travelling pulse.
       for (let i = 0; i < arcs.length; i++) {
         const a = arcs[i]
         const s = project(a.s.lat, a.s.lng, rot, R, cx, cy)
@@ -106,41 +120,55 @@ export function GlobeCanvas({ className = "" }: { className?: string }) {
         const bulge = len * 0.3
         const nx = -dy / (len || 1)
         const ny = dx / (len || 1)
-        const dir = my < cy ? 1 : 1
-        const ax = mx + nx * bulge * dir - (mx - cx) * 0.15
-        const ay = my + ny * bulge * dir - (my - cy) * 0.15
-        const vis = Math.max(0.12, (Math.max(s.z, e.z) + 1) / 2)
-        ctx.strokeStyle = `rgba(163,230,53,${vis * 0.7})`
-        ctx.lineWidth = 1.4
-        ctx.shadowBlur = 8
-        ctx.shadowColor = "rgba(163,230,53,0.6)"
+        const ax = mx + nx * bulge - (mx - cx) * 0.15
+        const ay = my + ny * bulge - (my - cy) * 0.15
+        const vis = Math.max(0.1, (Math.max(s.z, e.z) + 1) / 2)
+
+        ctx.strokeStyle = `rgba(${AMBER},${vis * 0.55})`
+        ctx.lineWidth = 1.2
         ctx.beginPath()
         ctx.moveTo(s.sx, s.sy)
         ctx.quadraticCurveTo(ax, ay, e.sx, e.sy)
         ctx.stroke()
-        ctx.shadowBlur = 0
-        // moving pulse
-        const prog = (t * 0.3 + i * 0.27) % 1
-        const u = prog
+
+        const u = (t * 0.28 + i * 0.27) % 1
         const px = (1 - u) * (1 - u) * s.sx + 2 * (1 - u) * u * ax + u * u * e.sx
         const py = (1 - u) * (1 - u) * s.sy + 2 * (1 - u) * u * ay + u * u * e.sy
-        ctx.fillStyle = "#c6f24e"
+        ctx.fillStyle = `rgba(255,214,140,${vis})`
         ctx.shadowBlur = 10
-        ctx.shadowColor = "#c6f24e"
+        ctx.shadowColor = `rgba(${AMBER},0.9)`
         ctx.beginPath()
-        ctx.arc(px, py, 2.4, 0, Math.PI * 2)
+        ctx.arc(px, py, 2.2, 0, Math.PI * 2)
         ctx.fill()
         ctx.shadowBlur = 0
       }
 
       if (!reduce) t += 0.016
-      raf = requestAnimationFrame(draw)
     }
-    raf = requestAnimationFrame(draw)
+
+    const loop = () => {
+      render()
+      raf = requestAnimationFrame(loop)
+    }
+
+    // Paint one frame synchronously before handing over to rAF. Browsers pause
+    // rAF entirely while a tab is hidden, so without this the globe can sit
+    // blank until the tab is focused — including on first paint if the first
+    // callback is delayed.
+    render()
+    raf = requestAnimationFrame(loop)
+
+    // Redraw immediately on resize too, rather than waiting for the next frame.
+    const onResize = () => {
+      resize()
+      render()
+    }
+    window.addEventListener("resize", onResize)
 
     return () => {
       cancelAnimationFrame(raf)
       ro.disconnect()
+      window.removeEventListener("resize", onResize)
     }
   }, [])
 

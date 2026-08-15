@@ -1,65 +1,23 @@
-import { ReactNode, useState } from "react"
-import {
-  motion,
-  MotionConfig,
-  useScroll,
-  useTransform,
-  useMotionValue,
-  useAnimationFrame,
-  useVelocity,
-  useSpring,
-  useMotionTemplate,
-  useReducedMotion,
-} from "framer-motion"
+import { ReactNode } from "react"
+import { motion, MotionConfig, useScroll, useTransform } from "framer-motion"
 import { Radio, Trophy, Gauge, Play, Activity, Car, ArrowRight, ArrowDown } from "lucide-react"
 import { AuroraBackground } from "./AuroraBackground"
 import { GlobeCanvas } from "./GlobeCanvas"
+import { RingButton } from "./RingButton"
 import { useLenis } from "./useLenis"
 import { useNavigate } from "react-router-dom"
 import { routes } from "../routes"
 import { Logo, Reveal, Counter, GlowButton } from "./ui"
 import { staggerParent, staggerChild } from "../lib/motion"
 
-const EASE = [0.16, 1, 0.3, 1] as const
-
 const FEATURES = [
-  { icon: Radio, title: "Live multiplayer racing", desc: "Race friends in real time — sub-second positions stream from every phone.", color: "#8b5cf6" },
-  { icon: Trophy, title: "F1 gap leaderboard", desc: "Gap to the leader and interval to the car ahead, updating live.", color: "#a3e635" },
-  { icon: Gauge, title: "Driving Score + AI coach", desc: "Safety, eco, comfort, performance — scored, with plain-English tips.", color: "#d946ef" },
-  { icon: Play, title: "Full drive replay", desc: "Scrub any finished drive back with the complete telemetry stream.", color: "#c084fc" },
-  { icon: Activity, title: "Telemetry HUD", desc: "Speed, altitude, heading and real G-force, interpolated buttery smooth.", color: "#bef264" },
+  { icon: Radio, title: "Live multiplayer racing", desc: "Race friends in real time — sub-second positions stream from every phone.", color: "#FFB020" },
+  { icon: Trophy, title: "F1 gap leaderboard", desc: "Gap to the leader and interval to the car ahead, updating live.", color: "#FFB020" },
+  { icon: Gauge, title: "Driving Score + AI coach", desc: "Safety, eco, comfort, performance — scored, with plain-English tips.", color: "#4DA6FF" },
+  { icon: Play, title: "Full drive replay", desc: "Scrub any finished drive back with the complete telemetry stream.", color: "#C084FC" },
+  { icon: Activity, title: "Telemetry HUD", desc: "Speed, altitude, heading and real G-force, interpolated buttery smooth.", color: "#3DD68C" },
   { icon: Car, title: "Your garage", desc: "Add your cars and track per-vehicle distance, top speeds and bests.", color: "#a78bfa" },
 ]
-
-// Floating channel-style tiles scattered around the globe (some blurred = depth).
-const TILES = [
-  { label: "LIVE", style: "left-[16%] top-[30%]", blur: false, big: false },
-  { label: "SCORE", style: "right-[20%] top-[20%]", blur: false, big: true },
-  { label: "REPLAY", style: "right-[12%] top-[42%]", blur: true, big: false },
-  { label: "GAP", style: "left-[24%] top-[52%]", blur: false, big: false },
-  { label: "SPRINT", style: "left-[18%] top-[68%]", blur: true, big: false },
-  { label: "HUD", style: "left-[42%] top-[70%]", blur: false, big: true },
-  { label: "TELEMETRY", style: "right-[24%] top-[62%]", blur: false, big: false },
-]
-
-function FloatingTile({ label, style, blur, big, i }: { label: string; style: string; blur: boolean; big: boolean; i: number }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: blur ? 0.55 : 1, scale: 1 }}
-      transition={{ duration: 0.7, delay: 0.5 + i * 0.08, ease: EASE }}
-      className={`absolute z-20 ${style}`}
-    >
-      <motion.div
-        animate={{ y: [0, -8, 0] }}
-        transition={{ duration: 4 + i * 0.4, repeat: Infinity, ease: "easeInOut" }}
-        className={`glass flex items-center justify-center rounded-2xl font-display font-semibold tracking-wide text-white/90 ${big ? "h-20 w-24 text-base" : "h-14 w-20 text-sm"} ${blur ? "blur-[2px]" : ""}`}
-      >
-        {label}
-      </motion.div>
-    </motion.div>
-  )
-}
 
 function Nav({ onEnter }: { onEnter: () => void }) {
   return (
@@ -79,76 +37,13 @@ function Nav({ onEnter }: { onEnter: () => void }) {
   )
 }
 
-// Spinning alloy wheel centerpiece. Drop your image at /public/wheel.png (or
-// .jpg/.jpeg/.webp) and it swaps in automatically; until then it shows the
-// animated race globe. The photo is masked to a circle so only the round
-// wheel+tyre shows while it spins.
-const WHEEL_SRCS = ["/wheel.png", "/wheel.jpg", "/wheel.jpeg", "/wheel.webp"]
+const HERO_CHIPS = [
+  { label: "Live racing", detail: "Sub-second" },
+  { label: "Drive score", detail: "0–100" },
+  { label: "Full replay", detail: "Every metre" },
+]
 
-function HeroWheel() {
-  const [idx, setIdx] = useState(0)
-  const [ok, setOk] = useState(false)
-  const exhausted = idx >= WHEEL_SRCS.length
-  const reduce = useReducedMotion()
-
-  // Continuous frame-driven spin (no loop seam) that speeds up with scroll.
-  const rot = useMotionValue(0)
-  const { scrollY } = useScroll()
-  const scrollVel = useVelocity(scrollY)
-  const smoothVel = useSpring(scrollVel, { stiffness: 220, damping: 45 })
-  useAnimationFrame((_, delta) => {
-    if (reduce) return
-    const base = 26 // deg/sec idle spin
-    const boost = smoothVel.get() * 0.025 // extra spin from scroll velocity
-    rot.set(rot.get() + (base + boost) * (delta / 1000))
-  })
-  // Motion blur that grows with spin speed (subtle).
-  const blurPx = useTransform(smoothVel, (v) => Math.min(3.5, Math.abs(v) * 0.0016))
-  const wheelFilter = useMotionTemplate`blur(${blurPx}px)`
-  // Counter-rotating specular sheen so the alloy catches light as it turns.
-  const sheen = useTransform(rot, (r) => -r * 0.6)
-  const sheenT = useMotionTemplate`rotate(${sheen}deg)`
-
-  return (
-    <motion.div
-      className="relative h-full w-full"
-      animate={reduce ? undefined : { y: [0, -10, 0] }}
-      transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-    >
-      {/* violet glow halo */}
-      <div className="pointer-events-none absolute inset-[-18%] rounded-full blur-3xl" style={{ background: "radial-gradient(circle, rgba(139,92,246,0.32), transparent 62%)" }} />
-
-      {!exhausted && (
-        <div className={`absolute inset-0 z-10 overflow-hidden rounded-full ${ok ? "" : "hidden"}`} style={{ boxShadow: "0 22px 60px rgba(0,0,0,0.65)" }}>
-          <motion.img
-            src={WHEEL_SRCS[idx]}
-            alt="Stratum alloy wheel"
-            onLoad={() => setOk(true)}
-            onError={() => { setOk(false); setIdx((i) => i + 1) }}
-            className="h-full w-full object-cover"
-            style={{ rotate: rot, filter: wheelFilter, objectPosition: "50% 72%", transformOrigin: "49% 50%", willChange: "transform" }}
-          />
-          {/* rotating specular sheen */}
-          <motion.div
-            className="pointer-events-none absolute inset-0 mix-blend-overlay"
-            style={{
-              transform: sheenT,
-              background: "conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.22) 30deg, transparent 90deg, transparent 210deg, rgba(255,255,255,0.12) 250deg, transparent 320deg)",
-            }}
-          />
-          {/* inner vignette for depth */}
-          <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(circle, transparent 55%, rgba(0,0,0,0.45) 100%)" }} />
-        </div>
-      )}
-      {/* lime rim ring on top of the wheel */}
-      {ok && <div className="pointer-events-none absolute inset-0 z-20 rounded-full ring-1 ring-[#a3e635]/45 shadow-[0_0_60px_rgba(163,230,53,0.22)]" />}
-
-      {!ok && <GlobeCanvas className="relative z-10 block h-full w-full" />}
-    </motion.div>
-  )
-}
-
-function HeroScene() {
+function HeroScene({ onEnter }: { onEnter: () => void }) {
   const { scrollY } = useScroll()
   const wordY = useTransform(scrollY, [0, 700], [0, -160])
   const wordOpacity = useTransform(scrollY, [0, 450], [1, 0])
@@ -157,38 +52,55 @@ function HeroScene() {
 
   return (
     <section className="relative flex h-[100dvh] items-center justify-center overflow-hidden">
-      <div className="mesh-dots pointer-events-none absolute inset-0 opacity-50" />
+      <div className="mesh-dots pointer-events-none absolute inset-0 opacity-40" />
 
       {/* Giant background word */}
       <motion.h1
         style={{ y: wordY, opacity: wordOpacity }}
-        className="font-anton pointer-events-none absolute select-none whitespace-nowrap text-[19vw] leading-none text-white/85"
+        className="font-anton pointer-events-none absolute select-none whitespace-nowrap text-[19vw] leading-none text-white/[0.07]"
       >
         STRATUM
       </motion.h1>
 
-      {/* Spinning alloy wheel (falls back to animated globe until image is added) */}
-      <motion.div style={{ scale: globeScale, opacity: globeOpacity }} className="relative z-10 aspect-square w-[46vmin]">
-        <HeroWheel />
+      {/* Globe + the ring it's arranged around. The globe is decoration and
+          must never eat the press, so it's pointer-events-none underneath. */}
+      <motion.div
+        style={{ scale: globeScale, opacity: globeOpacity }}
+        className="relative z-10 flex aspect-square w-[86vmin] max-w-[540px] items-center justify-center"
+      >
+        <GlobeCanvas className="pointer-events-none absolute inset-0 block h-full w-full" />
+
+        <div className="relative z-20 flex flex-col items-center">
+          <span className="mb-5 text-[10px] font-medium uppercase tracking-[0.25em] text-white/45">
+            Real-time telemetry
+          </span>
+          <RingButton label="Start" sublabel="Get going" onClick={onEnter} />
+        </div>
       </motion.div>
 
-      {/* Centered marker */}
-      <div className="absolute left-1/2 top-[46%] z-20 -translate-x-1/2 flex items-center gap-3 text-[10px] font-medium uppercase tracking-[0.25em] text-white/55">
-        <span>Real-time</span>
-        <span className="h-px w-16 bg-gradient-to-r from-[#8b5cf6] to-[#a3e635]" />
-        <span>Telemetry</span>
-      </div>
-
-      {/* Floating tiles */}
-      {TILES.map((tl, i) => (
-        <FloatingTile key={tl.label} {...tl} i={i} />
-      ))}
+      {/* Quick-glance chips under the ring, mirroring the reference's row of
+          shortcuts — here they state what you get rather than pretending to be
+          actions a signed-out visitor could take. */}
+      <motion.div
+        style={{ opacity: globeOpacity }}
+        className="absolute bottom-24 left-1/2 z-20 flex -translate-x-1/2 gap-2 px-4"
+      >
+        {HERO_CHIPS.map((c) => (
+          <div
+            key={c.label}
+            className="rounded-2xl border border-hairline bg-ink-1/80 px-4 py-2.5 text-center backdrop-blur-sm"
+          >
+            <div className="text-[10px] uppercase tracking-[0.15em] text-white/35">{c.detail}</div>
+            <div className="mt-0.5 text-xs font-medium text-white/85">{c.label}</div>
+          </div>
+        ))}
+      </motion.div>
 
       {/* Scroll hint */}
       <motion.div
         animate={{ y: [0, 8, 0] }}
         transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute bottom-8 left-1/2 z-20 -translate-x-1/2 flex flex-col items-center gap-1 text-white/40"
+        className="absolute bottom-8 left-1/2 z-20 -translate-x-1/2 flex flex-col items-center gap-1 text-white/35"
       >
         <span className="text-[10px] uppercase tracking-[0.2em]">Scroll</span>
         <ArrowDown size={16} />
@@ -205,7 +117,7 @@ function SportScene({ onEnter }: { onEnter: () => void }) {
         className="pointer-events-none absolute inset-0 opacity-70"
         style={{
           background:
-            "radial-gradient(80% 60% at 20% 30%, rgba(139,92,246,0.18), transparent 60%), repeating-linear-gradient(100deg, transparent 0 9px, rgba(255,255,255,0.018) 9px 10px)",
+            "radial-gradient(80% 60% at 20% 30%, rgba(255,176,32,0.18), transparent 60%), repeating-linear-gradient(100deg, transparent 0 9px, rgba(255,255,255,0.018) 9px 10px)",
         }}
       />
       <div className="relative mx-auto grid max-w-6xl items-stretch gap-6 lg:grid-cols-[1.4fr_1fr]">
@@ -213,7 +125,7 @@ function SportScene({ onEnter }: { onEnter: () => void }) {
         <div>
           <Reveal>
             <div className="mb-5 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.25em] text-white/50">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#a3e635]" /> Stratum Racing
+              <span className="h-1.5 w-1.5 rounded-full bg-[#FFB020]" /> Stratum Racing
             </div>
           </Reveal>
           <Reveal delay={0.05}>
@@ -225,8 +137,8 @@ function SportScene({ onEnter }: { onEnter: () => void }) {
           </Reveal>
           <Reveal delay={0.12}>
             <div className="mt-6 flex items-start gap-2">
-              <span className="font-anton text-3xl leading-none text-[#a3e635]">“</span>
-              <h3 className="font-display text-2xl font-bold uppercase tracking-tight text-[#c6f24e] md:text-3xl">Own your driving</h3>
+              <span className="font-anton text-3xl leading-none text-[#FFB020]">“</span>
+              <h3 className="font-display text-2xl font-bold uppercase tracking-tight text-[#FFC65C] md:text-3xl">Own your driving</h3>
             </div>
           </Reveal>
           <Reveal delay={0.18}>
@@ -243,9 +155,9 @@ function SportScene({ onEnter }: { onEnter: () => void }) {
 
         {/* Right: lime statement panel */}
         <Reveal delay={0.1}>
-          <div className="flex h-full flex-col justify-between rounded-3xl bg-[#c6f24e] p-7 text-[#0a0a12]">
-            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#0a0a12]/70">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#0a0a12]" /> Stratum Sport
+          <div className="flex h-full flex-col justify-between rounded-3xl bg-[#FFC65C] p-7 text-[#08080A]">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#08080A]/70">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#08080A]" /> Stratum Sport
             </div>
             <h3 className="font-display text-2xl font-bold leading-tight md:text-3xl">
               Stop just driving. Start racing the clock.
@@ -261,7 +173,7 @@ function Features() {
   return (
     <section id="features" className="relative z-10 mx-auto max-w-6xl px-5 py-24">
       <Reveal className="mb-12 text-center">
-        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#a3e635]">Features</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#FFB020]">Features</span>
         <h2 className="font-display mt-3 text-4xl font-bold tracking-tight md:text-5xl">Built like a race engineer's screen</h2>
         <p className="mx-auto mt-4 max-w-xl text-white/55">Everything to turn an ordinary drive into data — and a sprint into a race.</p>
       </Reveal>
@@ -339,11 +251,11 @@ export function LandingPage() {
   useLenis()
   return (
     <MotionConfig reducedMotion="user">
-      <div className="relative min-h-[100dvh] overflow-x-hidden bg-[#0a0a12] text-white">
+      <div className="relative min-h-[100dvh] overflow-x-hidden bg-[#08080A] text-white">
         <AuroraBackground />
         <Nav onEnter={onEnter} />
         <Section>
-          <HeroScene />
+          <HeroScene onEnter={onEnter} />
           <SportScene onEnter={onEnter} />
           <StatBand />
           <Features />
