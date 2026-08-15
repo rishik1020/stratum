@@ -19,6 +19,13 @@ are signed with it, and the default is an insecure development key:
 export STRATUM_SECRET_KEY="$(openssl rand -hex 32)"   # PowerShell: $env:STRATUM_SECRET_KEY = "..."
 ```
 
+Against local SQLite this only logs a warning if unset. Against a real
+database (`DATABASE_URL` set to Postgres) the app refuses to start without it
+— see `app/auth.py`.
+
+`/auth/login` (5/minute) and `/auth/signup` (10/hour) are rate-limited per IP
+via `slowapi` — see `app/rate_limit.py`.
+
 The server logs a warning on startup when this is unset.
 
 ## Run locally

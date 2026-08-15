@@ -8,8 +8,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.database import create_db_and_tables
+from app.rate_limit import limiter
 from app.routers import auth, sessions, telemetry, users, vehicles
 
 
@@ -22,6 +25,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Stratum Backend", lifespan=lifespan)
+
+# Rate limiting (currently only applied to the auth routes — see rate_limit.py).
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS. By default we allow any localhost port (local dev) AND the native
 # Capacitor WebView origins (Android serves the app from https://localhost, iOS

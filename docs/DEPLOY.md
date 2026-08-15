@@ -72,8 +72,13 @@ PC or tunnel running.
   in-memory room manager means **one instance only** — don't scale to 2+ workers
   without moving rooms to Redis.
 - **HTTPS is automatic** on Render, so `wss://` live telemetry works out of the box.
-- **Set `STRATUM_SECRET_KEY`.** The blueprint generates one. Without it the app
-  falls back to a known dev key and logs a warning — anyone could forge a token.
+- **Set `STRATUM_SECRET_KEY`.** The blueprint generates one automatically. If a
+  deploy ever skips it, the app now refuses to start rather than silently
+  falling back to the well-known dev key — it only tolerates that fallback
+  against local SQLite.
+- **`/auth/login` and `/auth/signup` are rate-limited** (5/minute, 10/hour, per
+  IP) via `slowapi`. In-memory, same constraint as the WebSocket rooms below —
+  move both to Redis together if you ever scale past one instance.
 
 ---
 
