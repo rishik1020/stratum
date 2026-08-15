@@ -105,8 +105,8 @@ export const LobbyScreen = () => {
   if (!currentSession) return <div>No session</div>
 
   return (
-    <div className="min-h-screen bg-gradient-stratum bg-stratum-darker">
-      <nav className="safe-top border-b border-white/[0.06]">
+    <div className="min-h-screen bg-ink">
+      <nav className="safe-top border-b border-hairline">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
@@ -114,7 +114,7 @@ export const LobbyScreen = () => {
               {/* Without polling, a dropped socket means a silently stale
                   roster — so say so rather than showing stale data as fresh. */}
               {connected ? (
-                <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-emerald-400/80">
+                <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-positive">
                   <Wifi size={13} />
                   Live
                 </span>
@@ -140,7 +140,7 @@ export const LobbyScreen = () => {
               <h2 className="display text-5xl mt-2">{currentSession.name}</h2>
             </div>
             <div className="text-right">
-              <span className="stat-num inline-block bg-white/[0.06] border border-white/10 text-white/80 px-3 py-1 rounded-full text-sm font-medium">
+              <span className="stat-num inline-block bg-ink-3 border border-hairline text-white/80 px-3 py-1 rounded-full text-sm font-medium">
                 {participants.length} / {currentSession.max_players}
               </span>
             </div>
@@ -161,17 +161,17 @@ export const LobbyScreen = () => {
                   <li className="text-white/60 text-sm">Waiting for participants...</li>
                 ) : (
                   participants.map((p) => (
-                    <li key={p.id} className="flex items-center justify-between bg-white/[0.03] border border-white/8 rounded-lg px-4 py-3">
+                    <li key={p.id} className="flex items-center justify-between bg-ink-2 border border-hairline rounded-lg px-4 py-3">
                       <div>
                         <span className="font-medium block">
                           {p.display_name || p.username || `Player ${p.user_id}`}
                           {p.user_id === currentSession.host_user_id && (
-                            <span className="ml-2 text-[10px] uppercase tracking-[0.15em] text-stratum-violet">Host</span>
+                            <span className="ml-2 text-[10px] uppercase tracking-[0.15em] text-amber">Host</span>
                           )}
                         </span>
                         {p.vehicle_label && <span className="text-xs text-white/50">{p.vehicle_label}</span>}
                       </div>
-                      <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${p.ready ? "bg-emerald-500/15 text-emerald-300/90" : "bg-white/8 text-white/50"}`}>
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${p.ready ? "bg-positive/15 text-positive" : "bg-ink-3 text-white/50"}`}>
                         {p.ready ? "Ready" : "Waiting"}
                       </span>
                     </li>
@@ -227,7 +227,7 @@ export const LobbyScreen = () => {
           </div>
         </div>
 
-        {error && <p className="text-red-400 mt-4">{error}</p>}
+        {error && <p className="text-negative mt-4">{error}</p>}
       </div>
     </div>
   )

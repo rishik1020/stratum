@@ -5,7 +5,7 @@ import { user as userApi } from "../api"
 import { initials } from "../lib/format"
 
 const inputClass =
-  "w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-white outline-none focus:border-white/25 transition-colors placeholder:text-white/30"
+  "w-full bg-ink-2 border border-hairline rounded-xl px-4 py-2.5 text-white outline-none focus:border-white/25 transition-colors placeholder:text-white/30"
 
 export const SettingsScreen = () => {
   const user = useAppStore((s) => s.user)
@@ -93,7 +93,7 @@ export const SettingsScreen = () => {
         <div>
           <label className="block text-xs font-medium text-white/50 mb-2">Profile picture</label>
           <div className="flex items-center gap-4">
-            <div className="w-20 h-20 rounded-full overflow-hidden border border-white/15 bg-white/5 flex items-center justify-center shrink-0">
+            <div className="w-20 h-20 rounded-full overflow-hidden border border-white/15 bg-ink-2 flex items-center justify-center shrink-0">
               {pic ? (
                 <img src={pic} alt="Profile" className="w-full h-full object-cover" />
               ) : (
@@ -124,7 +124,7 @@ export const SettingsScreen = () => {
           <label className="block text-xs font-medium text-white/50 mb-1.5">Bio</label>
           <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className={inputClass} placeholder="Tell the crew about your build…" />
         </div>
-        {error && <p className="text-red-400 text-sm">{error}</p>}
+        {error && <p className="text-negative text-sm">{error}</p>}
         <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50">
           {saving ? "Saving…" : saved ? "Saved ✓" : "Save profile"}
         </button>
@@ -141,8 +141,8 @@ export const SettingsScreen = () => {
                 onClick={() => setUnits(u)}
                 className={`px-5 py-2 rounded-xl font-medium text-sm border transition-colors ${
                   units === u
-                    ? "bg-white/[0.06] text-white border-white/20"
-                    : "bg-white/[0.02] text-white/50 border-white/10 hover:bg-white/[0.05]"
+                    ? "bg-ink-3 text-white border-white/20"
+                    : "bg-ink-1 text-white/50 border-hairline hover:bg-white/[0.05]"
                 }`}
               >
                 {u === "kmh" ? "km/h · km" : "mph · mi"}

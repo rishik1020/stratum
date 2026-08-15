@@ -285,7 +285,7 @@ export const LiveScreen = () => {
   const isSolo = !!currentSession?.is_solo
 
   return (
-    <div className="relative h-[100dvh] w-full overflow-hidden bg-stratum-darker">
+    <div className="relative h-[100dvh] w-full overflow-hidden bg-ink">
       {/* Map backdrop */}
       <div className="absolute inset-0">
         <LiveMap positions={mapPositions} meName={myName} avatars={avatars} showControls={false} />
@@ -312,20 +312,20 @@ export const LiveScreen = () => {
         {needsMotionPermission && (
           <button
             onClick={enableMotion}
-            className="w-full bg-stratum-violet/15 text-stratum-violet text-xs font-medium py-2 border-b border-stratum-violet/20"
+            className="w-full bg-amber/15 text-amber text-xs font-medium py-2 border-b border-amber/20"
           >
             Tap to enable G-force (motion access)
           </button>
         )}
         {geoError && (
-          <div className="w-full bg-red-500/15 text-red-300/90 text-xs py-2 px-4 text-center border-b border-red-500/20">
+          <div className="w-full bg-negative/15 text-negative text-xs py-2 px-4 text-center border-b border-negative/20">
             Location: {geoError} — allow location access and move to capture telemetry.
           </div>
         )}
       </div>
 
       {/* Bottom: standings (races only) + controls */}
-      <div className="absolute bottom-0 inset-x-0 z-[600] bg-stratum-darker/85 backdrop-blur-md border-t border-white/10">
+      <div className="absolute bottom-0 inset-x-0 z-[600] bg-ink/85 backdrop-blur-md border-t border-hairline">
         {!isSolo && (
           <>
             <button

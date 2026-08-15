@@ -36,8 +36,8 @@ export const CreateSessionScreen = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-stratum bg-stratum-darker">
-      <nav className="safe-top border-b border-white/[0.06]">
+    <div className="min-h-screen bg-ink">
+      <nav className="safe-top border-b border-hairline">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <button
             onClick={() => navigate(routes.dashboard)}
@@ -63,7 +63,7 @@ export const CreateSessionScreen = () => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Urban Launch"
-              className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-white outline-none focus:border-white/25 transition-colors"
+              className="w-full bg-ink-2 border border-hairline rounded-xl px-4 py-2.5 text-white outline-none focus:border-white/25 transition-colors"
             />
           </div>
 
@@ -72,10 +72,10 @@ export const CreateSessionScreen = () => {
             <select
               value={maxPlayers}
               onChange={(e) => setMaxPlayers(Number(e.target.value))}
-              className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-white outline-none focus:border-white/25 transition-colors"
+              className="w-full bg-ink-2 border border-hairline rounded-xl px-4 py-2.5 text-white outline-none focus:border-white/25 transition-colors"
             >
               {[2, 3, 4, 5, 6, 8, 10].map((n) => (
-                <option key={n} value={n} className="bg-stratum-darker">
+                <option key={n} value={n} className="bg-ink">
                   {n} players
                 </option>
               ))}
@@ -87,14 +87,14 @@ export const CreateSessionScreen = () => {
             <select
               value={visibility}
               onChange={(e) => setVisibility(e.target.value)}
-              className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-white outline-none focus:border-white/25 transition-colors"
+              className="w-full bg-ink-2 border border-hairline rounded-xl px-4 py-2.5 text-white outline-none focus:border-white/25 transition-colors"
             >
-              <option value="private" className="bg-stratum-darker">Private</option>
-              <option value="invite" className="bg-stratum-darker">Invite only</option>
+              <option value="private" className="bg-ink">Private</option>
+              <option value="invite" className="bg-ink">Invite only</option>
             </select>
           </div>
 
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {error && <p className="text-negative text-sm">{error}</p>}
 
           <button
             type="submit"

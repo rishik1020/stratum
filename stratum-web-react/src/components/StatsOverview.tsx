@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { user as userApi } from "../api"
-import { axisProps, gridProps, SCORE_LINES, tooltipStyle, VIOLET } from "../lib/charts"
+import { axisProps, gridProps, SCORE_LINES, tooltipStyle, ACCENT } from "../lib/charts"
 import { fmtHours } from "../lib/format"
 import { useUnits } from "../lib/units"
 import {
@@ -37,13 +37,13 @@ const Delta = ({ pct }: { pct: number | null | undefined }) =>
   pct == null ? (
     <span className="text-xs text-white/30">— vs prev</span>
   ) : (
-    <span className={`text-xs font-medium ${pct >= 0 ? "text-emerald-400/80" : "text-red-400/80"}`}>
+    <span className={`text-xs font-medium ${pct >= 0 ? "text-positive" : "text-negative"}`}>
       {pct >= 0 ? "▲" : "▼"} {Math.abs(pct)}% vs prev
     </span>
   )
 
 const Best = ({ label, value, unit }: { label: string; value: string; unit?: string }) => (
-  <div className="bg-white/[0.03] border border-white/8 rounded-lg px-4 py-3">
+  <div className="bg-ink-2 border border-hairline rounded-lg px-4 py-3">
     <span className="eyebrow">{label}</span>
     <strong className="stat-num text-xl font-medium block mt-1">
       {value}
@@ -73,7 +73,7 @@ export const StatsOverview = ({ refreshKey = 0 }: { refreshKey?: number }) => {
       {/* Range selector */}
       <div className="flex items-center justify-between gap-2">
         <span className="eyebrow">Overview</span>
-        <div className="flex gap-1 rounded-lg bg-white/[0.03] border border-white/8 p-0.5">
+        <div className="flex gap-1 rounded-lg bg-ink-2 border border-hairline p-0.5">
           {RANGES.map((r) => (
             <button
               key={r.d}
@@ -124,14 +124,14 @@ export const StatsOverview = ({ refreshKey = 0 }: { refreshKey?: number }) => {
               <AreaChart data={stats.trend.map((t) => ({ label: t.label, d: toDist(t.distance_m) }))} margin={{ top: 5, right: 6, bottom: 0, left: -24 }}>
                 <defs>
                   <linearGradient id="distFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={VIOLET} stopOpacity={0.35} />
-                    <stop offset="100%" stopColor={VIOLET} stopOpacity={0} />
+                    <stop offset="0%" stopColor={ACCENT} stopOpacity={0.35} />
+                    <stop offset="100%" stopColor={ACCENT} stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="label" {...axisProps} tick={{ fontSize: 10 }} />
                 <YAxis {...axisProps} width={28} />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Area type="monotone" dataKey="d" name={distUnit} stroke={VIOLET} strokeWidth={2} fill="url(#distFill)" />
+                <Area type="monotone" dataKey="d" name={distUnit} stroke={ACCENT} strokeWidth={2} fill="url(#distFill)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -155,7 +155,7 @@ export const StatsOverview = ({ refreshKey = 0 }: { refreshKey?: number }) => {
           <h3 className="font-semibold mb-4">By vehicle</h3>
           <ul className="space-y-2">
             {stats.by_vehicle.map((v) => (
-              <li key={v.vehicle_id} className="flex items-center justify-between bg-white/[0.03] border border-white/8 rounded-lg px-4 py-3">
+              <li key={v.vehicle_id} className="flex items-center justify-between bg-ink-2 border border-hairline rounded-lg px-4 py-3">
                 <div className="min-w-0">
                   <strong className="block font-medium truncate">{v.label}</strong>
                   <span className="stat-num text-xs text-white/45">

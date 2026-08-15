@@ -23,7 +23,7 @@ const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
 const Bar = ({ fill }: { fill: number }) => (
   <div className="h-1.5 rounded-full bg-white/[0.08] overflow-hidden">
     <div
-      className="h-full rounded-full bg-stratum-violet/80 transition-[width] duration-300 ease-out"
+      className="h-full rounded-full bg-amber/80 transition-[width] duration-300 ease-out"
       style={{ width: `${clamp01(fill) * 100}%` }}
     />
   </div>
@@ -80,7 +80,7 @@ export const TelemetryHUD = ({
   const progress = total > 0 ? clamp01(elapsedS / total) : 0
 
   return (
-    <div className="safe-top bg-stratum-darker/80 backdrop-blur-md border-b border-white/10 overflow-hidden">
+    <div className="safe-top bg-ink/80 backdrop-blur-md border-b border-hairline overflow-hidden">
       {/* Top strip: title + LIVE / playback position */}
       <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-3">
         <div className="min-w-0">
@@ -91,7 +91,7 @@ export const TelemetryHUD = ({
         </div>
         {mode === "live" ? (
           online ? (
-            <span className="shrink-0 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-red-400/90">
+            <span className="shrink-0 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-negative">
               <Radio size={13} className="animate-pulse" />
               Live
             </span>
@@ -117,10 +117,10 @@ export const TelemetryHUD = ({
             max={Math.max(1, Math.floor(total))}
             value={Math.floor(elapsedS)}
             onChange={(e) => onSeek?.(Number(e.target.value))}
-            className="w-full accent-stratum-violet cursor-pointer"
+            className="w-full accent-amber cursor-pointer"
           />
         ) : (
-          <div className="h-0.5 rounded-full bg-white/8 overflow-hidden">
+          <div className="h-0.5 rounded-full bg-ink-3 overflow-hidden">
             <div className="h-full bg-white/30" style={{ width: `${progress * 100}%` }} />
           </div>
         )}

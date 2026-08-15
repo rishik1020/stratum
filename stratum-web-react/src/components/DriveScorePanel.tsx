@@ -65,7 +65,7 @@ const SubBar = ({ icon, label, value }: { icon: React.ReactNode; label: string; 
       <span className="flex items-center gap-1.5 text-sm text-white/70">{icon}{label}</span>
       <strong className="text-sm">{value}</strong>
     </div>
-    <div className="h-2 rounded-full bg-white/8 overflow-hidden">
+    <div className="h-2 rounded-full bg-ink-3 overflow-hidden">
       <div className="h-full rounded-full" style={{ width: `${value}%`, background: scoreColor(value) }} />
     </div>
   </div>
@@ -111,9 +111,9 @@ export const DriveScorePanel = ({ sessionId }: { sessionId: number }) => {
         </div>
 
         <div className="col-span-2 space-y-3">
-          <SubBar icon={<Shield size={14} className="text-stratum-lime" />} label="Safety" value={score.safety} />
-          <SubBar icon={<Leaf size={14} className="text-green-400" />} label="Eco" value={score.eco} />
-          <SubBar icon={<Gauge size={14} className="text-stratum-violet" />} label="Performance" value={score.performance} />
+          <SubBar icon={<Shield size={14} className="text-amber" />} label="Safety" value={score.safety} />
+          <SubBar icon={<Leaf size={14} className="text-positive" />} label="Eco" value={score.eco} />
+          <SubBar icon={<Gauge size={14} className="text-amber" />} label="Performance" value={score.performance} />
           <SubBar icon={<Sofa size={14} className="text-pink-400" />} label="Comfort" value={score.comfort} />
         </div>
       </div>
@@ -129,7 +129,7 @@ export const DriveScorePanel = ({ sessionId }: { sessionId: number }) => {
           ["Fuel est.", metrics.fuel_liters_est != null ? `${metrics.fuel_liters_est} L` : "—"],
           ["CO₂ est.", metrics.co2_grams_est != null ? `${(metrics.co2_grams_est / 1000).toFixed(2)} kg` : "—"],
         ].map(([k, v]) => (
-          <div key={k} className="bg-white/[0.03] border border-white/8 rounded-lg px-3 py-2">
+          <div key={k} className="bg-ink-2 border border-hairline rounded-lg px-3 py-2">
             <span className="text-[11px] text-white/45 block">{k}</span>
             <strong className="stat-num text-sm font-medium">{v}</strong>
           </div>
@@ -148,7 +148,7 @@ export const DriveScorePanel = ({ sessionId }: { sessionId: number }) => {
         <div>
           {insights.strengths.length > 0 && (
             <>
-              <p className="text-xs font-medium text-green-400 mb-1">Strengths</p>
+              <p className="text-xs font-medium text-positive mb-1">Strengths</p>
               <ul className="space-y-1 mb-3">
                 {insights.strengths.map((s, i) => (
                   <li key={i} className="text-sm text-white/75">• {s}</li>
@@ -158,7 +158,7 @@ export const DriveScorePanel = ({ sessionId }: { sessionId: number }) => {
           )}
           {insights.weaknesses.length > 0 && (
             <>
-              <p className="text-xs font-medium text-red-400 mb-1 flex items-center gap-1"><AlertTriangle size={12} /> Weaknesses</p>
+              <p className="text-xs font-medium text-negative mb-1 flex items-center gap-1"><AlertTriangle size={12} /> Weaknesses</p>
               <ul className="space-y-1">
                 {insights.weaknesses.map((s, i) => (
                   <li key={i} className="text-sm text-white/75">• {s}</li>
@@ -168,7 +168,7 @@ export const DriveScorePanel = ({ sessionId }: { sessionId: number }) => {
           )}
         </div>
         <div>
-          <p className="text-xs font-medium text-stratum-lime mb-1 flex items-center gap-1"><Lightbulb size={12} /> Coach recommends</p>
+          <p className="text-xs font-medium text-amber mb-1 flex items-center gap-1"><Lightbulb size={12} /> Coach recommends</p>
           <ul className="space-y-1">
             {insights.recommendations.map((s, i) => (
               <li key={i} className="text-sm text-white/75">• {s}</li>
@@ -183,7 +183,7 @@ export const DriveScorePanel = ({ sessionId }: { sessionId: number }) => {
 const Chip = ({ text, tone }: { text: string; tone: "good" | "bad" }) => (
   <span
     className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-      tone === "good" ? "bg-green-500/15 text-green-400" : "bg-red-500/15 text-red-400"
+      tone === "good" ? "bg-positive/15 text-positive" : "bg-negative/15 text-negative"
     }`}
   >
     {text}

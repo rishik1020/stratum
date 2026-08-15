@@ -36,8 +36,8 @@ export const JoinSessionScreen = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-stratum bg-stratum-darker">
-      <nav className="safe-top border-b border-white/[0.06]">
+    <div className="min-h-screen bg-ink">
+      <nav className="safe-top border-b border-hairline">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <button
             onClick={() => navigate(routes.dashboard)}
@@ -64,7 +64,7 @@ export const JoinSessionScreen = () => {
               onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
               placeholder="STRAT-7824"
               maxLength={10}
-              className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-white/25 transition-colors text-center text-2xl font-mono tracking-[0.2em] placeholder:text-white/25"
+              className="w-full bg-ink-2 border border-hairline rounded-xl px-4 py-3 text-white outline-none focus:border-white/25 transition-colors text-center text-2xl font-mono tracking-[0.2em] placeholder:text-white/25"
             />
           </div>
 
@@ -72,7 +72,7 @@ export const JoinSessionScreen = () => {
             Ask your crew for the room code, or use an invite link they sent.
           </p>
 
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {error && <p className="text-negative text-sm">{error}</p>}
 
           <button
             type="submit"

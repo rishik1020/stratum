@@ -103,7 +103,7 @@ export const GarageScreen = () => {
       </div>
 
       {!hasActive && !loading && (
-        <div className="card mb-6 border-stratum-violet/40 text-stratum-violet text-sm">
+        <div className="card mb-6 border-amber/40 text-amber text-sm">
           You need an active vehicle to create or join a sprint. Add one and set it active below.
         </div>
       )}
@@ -115,7 +115,7 @@ export const GarageScreen = () => {
       )}
 
       {error && !showAdd && (
-        <div className="card mb-6 border-red-500/40 text-red-400 text-sm">{error}</div>
+        <div className="card mb-6 border-negative/40 text-negative text-sm">{error}</div>
       )}
 
       <div className="card">
@@ -130,7 +130,7 @@ export const GarageScreen = () => {
         ) : (
           <ul className="space-y-2">
             {vehicles.map((v) => (
-              <li key={v.id} className="flex items-center justify-between bg-white/5 border border-white/8 rounded-lg px-4 py-3">
+              <li key={v.id} className="flex items-center justify-between bg-ink-2 border border-hairline rounded-lg px-4 py-3">
                 <div>
                   <strong className="block">{v.year} {v.manufacturer} {v.model}</strong>
                   <span className="text-xs text-white/60">
@@ -139,7 +139,7 @@ export const GarageScreen = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   {v.is_active ? (
-                    <span className="flex items-center gap-1 text-xs px-2 py-1 rounded font-bold bg-green-500/20 text-green-400">
+                    <span className="flex items-center gap-1 text-xs px-2 py-1 rounded font-bold bg-positive/20 text-positive">
                       <Check size={14} /> Active
                     </span>
                   ) : (
@@ -152,7 +152,7 @@ export const GarageScreen = () => {
                       <button
                         onClick={() => handleDelete(v.id)}
                         disabled={deletingId === v.id}
-                        className="text-xs font-bold px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 disabled:opacity-50"
+                        className="text-xs font-bold px-2 py-1 rounded bg-negative/20 text-negative hover:bg-negative/30 disabled:opacity-50"
                       >
                         {deletingId === v.id ? "Deleting…" : "Confirm"}
                       </button>
@@ -167,7 +167,7 @@ export const GarageScreen = () => {
                     <button
                       onClick={() => setConfirmId(v.id)}
                       title="Delete vehicle"
-                      className="p-2 rounded-lg text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                      className="p-2 rounded-lg text-white/50 hover:text-negative hover:bg-negative/10 transition-colors"
                     >
                       <Trash2 size={16} />
                     </button>

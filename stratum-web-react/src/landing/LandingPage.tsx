@@ -267,7 +267,7 @@ function Features() {
       </Reveal>
       <motion.div variants={staggerParent} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }} className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {FEATURES.map((f) => (
-          <motion.div key={f.title} variants={staggerChild} whileHover={{ y: -6 }} className="glass group relative overflow-hidden rounded-2xl p-6 transition-colors hover:bg-white/[0.06]">
+          <motion.div key={f.title} variants={staggerChild} whileHover={{ y: -6 }} className="glass group relative overflow-hidden rounded-2xl p-6 transition-colors hover:bg-ink-3">
             <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-100" style={{ background: f.color }} />
             <div className="relative">
               <div className="mb-4 inline-flex rounded-xl p-2.5" style={{ background: `${f.color}22`, border: `1px solid ${f.color}40` }}>
@@ -348,7 +348,7 @@ export function LandingPage() {
           <StatBand />
           <Features />
           <Cta onEnter={onEnter} />
-          <footer className="border-t border-white/[0.06]">
+          <footer className="border-t border-hairline">
             <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 py-8 sm:flex-row">
               <Logo size={24} />
               <p className="text-xs text-white/40">© {new Date().getFullYear()} Stratum · Strava for cars.</p>

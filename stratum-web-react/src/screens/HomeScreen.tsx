@@ -78,32 +78,32 @@ export const HomeScreen = () => {
       {!hasActiveVehicle && (
         <button
           onClick={() => navigate(routes.garage)}
-          className="card w-full mb-8 flex items-center justify-between border-stratum-violet/30 hover:bg-white/[0.05] transition-colors text-left"
+          className="card w-full mb-8 flex items-center justify-between border-amber/30 hover:bg-white/[0.05] transition-colors text-left"
         >
           <div className="flex items-center gap-3">
-            <Car size={22} className="text-stratum-violet" />
+            <Car size={22} className="text-amber" />
             <div>
               <strong className="block font-medium">Set up your garage</strong>
               <span className="text-sm text-white/50">Add and activate a vehicle to start racing.</span>
             </div>
           </div>
-          <span className="text-stratum-violet font-medium text-sm">Go →</span>
+          <span className="text-amber font-medium text-sm">Go →</span>
         </button>
       )}
 
       <button
         onClick={startSolo}
         disabled={!hasActiveVehicle || starting}
-        className="card w-full mb-4 md:mb-6 flex items-center justify-between text-left bg-stratum-violet/10 border-stratum-violet/30 hover:bg-stratum-violet/[0.16] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="card w-full mb-4 md:mb-6 flex items-center justify-between text-left bg-amber/10 border-amber/30 hover:bg-amber/[0.16] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
         <div className="flex items-center gap-3">
-          <Navigation size={22} className="text-stratum-violet" />
+          <Navigation size={22} className="text-amber" />
           <div>
             <strong className="block font-medium">{starting ? "Starting…" : "Start a solo drive"}</strong>
             <span className="text-sm text-white/50">Track a drive — speed, route & score. No opponents.</span>
           </div>
         </div>
-        <span className="text-stratum-violet font-medium text-sm shrink-0 ml-2">Go →</span>
+        <span className="text-amber font-medium text-sm shrink-0 ml-2">Go →</span>
       </button>
 
       <div className="grid grid-cols-2 gap-4 md:gap-6">
@@ -116,7 +116,7 @@ export const HomeScreen = () => {
             <span className="eyebrow">Quick action</span>
             <h3 className="text-2xl font-medium mt-2">Create Sprint</h3>
           </div>
-          <Plus size={28} className="text-white/40 group-hover:text-stratum-violet transition-colors" />
+          <Plus size={28} className="text-white/40 group-hover:text-amber transition-colors" />
         </button>
 
         <button
@@ -128,7 +128,7 @@ export const HomeScreen = () => {
             <span className="eyebrow">Join a session</span>
             <h3 className="text-2xl font-medium mt-2">Join by Code</h3>
           </div>
-          <Users size={28} className="text-white/40 group-hover:text-stratum-violet transition-colors" />
+          <Users size={28} className="text-white/40 group-hover:text-amber transition-colors" />
         </button>
       </div>
     </div>

@@ -43,7 +43,7 @@ export const AuthScreen = () => {
   }
 
   return (
-    <div className="relative min-h-[100dvh] bg-stratum-darker flex items-center justify-center px-4 pt-[calc(env(safe-area-inset-top)+1rem)] pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+    <div className="relative min-h-[100dvh] bg-ink flex items-center justify-center px-4 pt-[calc(env(safe-area-inset-top)+1rem)] pb-[calc(env(safe-area-inset-bottom)+1rem)]">
       <AuroraBackground />
       <div className="card relative z-10 w-full max-w-md">
         <div className="text-center mb-8">
@@ -87,7 +87,7 @@ export const AuthScreen = () => {
 
           <div>
             <label className="block text-xs font-medium text-white/50 mb-1.5">Email</label>
-            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+            <div className="flex items-center gap-2 bg-ink-2 border border-hairline rounded-xl px-3 py-2">
               <Mail size={18} className="text-white/50" />
               <input
                 type="email"
@@ -101,7 +101,7 @@ export const AuthScreen = () => {
 
           <div>
             <label className="block text-xs font-medium text-white/50 mb-1.5">Password</label>
-            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+            <div className="flex items-center gap-2 bg-ink-2 border border-hairline rounded-xl px-3 py-2">
               <Lock size={18} className="text-white/50" />
               <input
                 type="password"
@@ -113,7 +113,7 @@ export const AuthScreen = () => {
             </div>
           </div>
 
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {error && <p className="text-negative text-sm">{error}</p>}
 
           <button
             type="submit"

@@ -14,7 +14,7 @@ export interface VehiclePayload {
 
 const OTHER = "__other__"
 const selectClass =
-  "w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-white outline-none focus:border-white/25 transition-colors placeholder:text-white/30"
+  "w-full bg-ink-2 border border-hairline rounded-xl px-3 py-2 text-white outline-none focus:border-white/25 transition-colors placeholder:text-white/30"
 
 export const VehicleForm = ({
   onCreate,
@@ -99,16 +99,16 @@ export const VehicleForm = ({
   }
 
   return (
-    <form onSubmit={submit} className="bg-white/[0.02] border border-white/8 rounded-2xl p-5 space-y-4">
+    <form onSubmit={submit} className="bg-ink-1 border border-hairline rounded-2xl p-5 space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium mb-1 text-white/50">Make</label>
           <select value={makeName} onChange={(e) => handleMake(e.target.value)} className={selectClass} required>
-            <option value="" className="bg-stratum-darker">Select make…</option>
+            <option value="" className="bg-ink">Select make…</option>
             {CAR_CATALOG.map((m) => (
-              <option key={m.make} value={m.make} className="bg-stratum-darker">{m.make}</option>
+              <option key={m.make} value={m.make} className="bg-ink">{m.make}</option>
             ))}
-            <option value={OTHER} className="bg-stratum-darker">Other (type manually)</option>
+            <option value={OTHER} className="bg-ink">Other (type manually)</option>
           </select>
         </div>
 
@@ -121,9 +121,9 @@ export const VehicleForm = ({
           <div>
             <label className="block text-xs font-medium mb-1 text-white/50">Model</label>
             <select value={modelName} onChange={(e) => handleModel(e.target.value)} className={selectClass} disabled={!make} required>
-              <option value="" className="bg-stratum-darker">{make ? "Select model…" : "Pick a make first"}</option>
+              <option value="" className="bg-ink">{make ? "Select model…" : "Pick a make first"}</option>
               {make?.models.map((m) => (
-                <option key={m.model} value={m.model} className="bg-stratum-darker">{m.model}</option>
+                <option key={m.model} value={m.model} className="bg-ink">{m.model}</option>
               ))}
             </select>
           </div>
@@ -146,25 +146,25 @@ export const VehicleForm = ({
           <div>
             <label className="block text-xs font-medium mb-1 text-white/50">Year</label>
             <select value={year} onChange={(e) => setYear(Number(e.target.value))} className={selectClass} disabled={!model} required>
-              <option value="" className="bg-stratum-darker">{model ? "Select year…" : "Pick a model first"}</option>
+              <option value="" className="bg-ink">{model ? "Select year…" : "Pick a model first"}</option>
               {years.map((y) => (
-                <option key={y} value={y} className="bg-stratum-darker">{y}</option>
+                <option key={y} value={y} className="bg-ink">{y}</option>
               ))}
             </select>
           </div>
           <div>
             <label className="block text-xs font-medium mb-1 text-white/50">Trim</label>
             <select value={trimName} onChange={(e) => handleTrim(e.target.value)} className={selectClass} disabled={!model} required>
-              <option value="" className="bg-stratum-darker">{model ? "Select trim…" : "Pick a model first"}</option>
+              <option value="" className="bg-ink">{model ? "Select trim…" : "Pick a model first"}</option>
               {model?.trims.map((t) => (
-                <option key={t.trim} value={t.trim} className="bg-stratum-darker">{t.trim} · {t.horsepower} hp</option>
+                <option key={t.trim} value={t.trim} className="bg-ink">{t.trim} · {t.horsepower} hp</option>
               ))}
             </select>
           </div>
         </div>
       )}
 
-      <div className="border-t border-white/8 pt-3">
+      <div className="border-t border-hairline pt-3">
         <p className="text-xs text-white/50 mb-2">Specs {!isManual && "(autofilled — edit if your car is modified)"}</p>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -186,7 +186,7 @@ export const VehicleForm = ({
         </div>
       </div>
 
-      {error && <p className="text-red-400 text-sm">{error}</p>}
+      {error && <p className="text-negative text-sm">{error}</p>}
 
       <button type="submit" disabled={saving} className="btn-primary w-full disabled:opacity-50">
         {saving ? "Saving…" : "Add to garage"}

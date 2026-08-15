@@ -200,7 +200,7 @@ export const AnalyticsScreen = () => {
           <div className="card">
             <div className="flex items-center justify-between gap-2 mb-4">
               <h3 className="font-semibold">Past sprints</h3>
-              <div className="flex gap-1 rounded-lg bg-white/[0.03] border border-white/8 p-0.5">
+              <div className="flex gap-1 rounded-lg bg-ink-2 border border-hairline p-0.5">
                 {(["all", "wins", "podiums"] as const).map((f) => (
                   <button
                     key={f}
@@ -221,7 +221,7 @@ export const AnalyticsScreen = () => {
             ) : (
             <ul className="space-y-2">
               {visibleSessions.slice(0, 15).map((s) => (
-                <li key={s.session_id} className="flex items-center justify-between bg-white/5 border border-white/8 rounded-lg px-4 py-3">
+                <li key={s.session_id} className="flex items-center justify-between bg-ink-2 border border-hairline rounded-lg px-4 py-3">
                   <div>
                     <strong className="block">{s.name}</strong>
                     <span className="text-xs text-white/60">
@@ -240,7 +240,7 @@ export const AnalyticsScreen = () => {
                         onClick={() => navigate(routes.replay(s.session_id))}
                         title="Watch replay"
                         aria-label={`Replay ${s.name}`}
-                        className="p-2 rounded-lg text-white/40 hover:text-stratum-violet hover:bg-white/[0.05] transition-colors"
+                        className="p-2 rounded-lg text-white/40 hover:text-amber hover:bg-white/[0.05] transition-colors"
                       >
                         <Play size={16} />
                       </button>
@@ -251,7 +251,7 @@ export const AnalyticsScreen = () => {
                         disabled={deletingId === s.session_id}
                         title="Delete session"
                         aria-label={`Delete ${s.name}`}
-                        className="p-2 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40"
+                        className="p-2 rounded-lg text-white/40 hover:text-negative hover:bg-negative/10 transition-colors disabled:opacity-40"
                       >
                         <Trash2 size={16} />
                       </button>

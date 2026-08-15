@@ -11,7 +11,7 @@ export interface DriverStanding {
 }
 
 const Avatar = ({ info, name }: { info?: AvatarInfo; name: string }) => (
-  <div className="w-8 h-8 shrink-0 rounded-full overflow-hidden border border-white/15 bg-white/5 flex items-center justify-center">
+  <div className="w-8 h-8 shrink-0 rounded-full overflow-hidden border border-white/15 bg-ink-2 flex items-center justify-center">
     {info?.url ? (
       <img src={info.url} alt="" className="w-full h-full object-cover" />
     ) : (
@@ -44,13 +44,13 @@ export const Standings = ({
           key={driver.user}
           className={`flex items-center gap-3 rounded-lg px-3 py-2 border ${
             driver.user === myName
-              ? "bg-stratum-lime/15 border-stratum-lime/40"
-              : "bg-white/5 border-white/8"
+              ? "bg-amber/15 border-amber/40"
+              : "bg-ink-2 border-hairline"
           }`}
         >
           <span
             className={`stat-num w-5 shrink-0 text-center font-semibold ${
-              driver.position === 1 ? "text-stratum-violet" : "text-white/40"
+              driver.position === 1 ? "text-amber" : "text-white/40"
             }`}
           >
             {driver.position}
@@ -64,7 +64,7 @@ export const Standings = ({
           </div>
           <div className="text-right shrink-0">
             {driver.position === 1 ? (
-              <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-stratum-violet">Leader</span>
+              <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-amber">Leader</span>
             ) : (
               <>
                 <strong className="stat-num block text-sm font-medium">+{driver.gapToLeaderM} m</strong>

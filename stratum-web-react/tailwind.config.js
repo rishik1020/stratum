@@ -8,29 +8,59 @@ module.exports = {
       fontFamily: {
         sans: ["Inter", "system-ui", "-apple-system", "sans-serif"],
         display: ['"Space Grotesk"', "Inter", "sans-serif"],
-        serif: ['"Instrument Serif"', "Georgia", "serif"],
         mono: ['"JetBrains Mono"', "ui-monospace", "SFMono-Regular", "monospace"],
       },
-      opacity: {
-        2: "0.02",
-        4: "0.04",
-        6: "0.06",
-        8: "0.08",
-        12: "0.12",
-      },
       colors: {
-        // Violet → Lime fusion on near-black.
-        // (These were named -blue and -gold before a palette swap left the
-        // names pointing at the wrong colours. Named for what they are now.)
-        "stratum-darker": "#0a0a12", // near-black base
-        "stratum-dark": "#14121f", // elevated surface
-        "stratum-lime": "#a3e635", // lime — secondary / energy
-        "stratum-violet": "#8b5cf6", // electric violet — primary accent
+        // --- Surfaces -------------------------------------------------------
+        // A real ramp instead of stacked white/[0.0x] overlays. Higher number =
+        // more elevated. `ink` is the page floor; everything else sits on it.
+        ink: {
+          DEFAULT: "#08080A", // page background
+          1: "#0E0E11", // resting card
+          2: "#15151A", // raised card / popover
+          3: "#1D1D23", // hover, pressed, input wells
+        },
+
+        // --- Lines ----------------------------------------------------------
+        hairline: {
+          DEFAULT: "rgba(255,255,255,0.07)", // default divider
+          strong: "rgba(255,255,255,0.13)", // emphasis, focus
+        },
+
+        // --- Accent ---------------------------------------------------------
+        // Amber earns its place by being rare: active nav, the current session,
+        // "this is yours". It deliberately avoids red (errors) and green
+        // (success) so those keep their meaning.
+        amber: {
+          DEFAULT: "#FFB020",
+          soft: "#FFC65C", // hover / lighter strokes
+          deep: "#C77F00", // pressed
+          ink: "#2A1B02", // text ON a solid amber fill
+          // Low-alpha washes for tinted backgrounds and rings.
+          "05": "rgba(255,176,32,0.05)",
+          10: "rgba(255,176,32,0.10)",
+          20: "rgba(255,176,32,0.20)",
+          40: "rgba(255,176,32,0.40)",
+        },
+
+        // --- Semantic (unchanged meaning, retuned for the new base) ----------
+        positive: "#3DD68C",
+        negative: "#FF5A52",
       },
-      backgroundImage: {
-        // Near-black with a violet glow from the top and a lime glow in the corner.
-        "gradient-stratum":
-          "radial-gradient(120% 80% at 50% -10%, rgba(139,92,246,0.14), transparent 55%), radial-gradient(70% 60% at 85% 0%, rgba(163,230,53,0.08), transparent 50%)",
+      fontSize: {
+        // Oversized numerals for hero stats — the world-clock/crypto references
+        // both lead with a very large figure and a small unit beside it.
+        hero: ["clamp(3rem, 12vw, 5.5rem)", { lineHeight: "0.9", letterSpacing: "-0.04em" }],
+        stat: ["clamp(1.75rem, 6vw, 2.5rem)", { lineHeight: "1", letterSpacing: "-0.03em" }],
+      },
+      borderRadius: {
+        card: "16px",
+        pill: "999px",
+      },
+      boxShadow: {
+        // The floating pill nav needs real elevation to read as floating.
+        float: "0 8px 32px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.4)",
+        "amber-glow": "0 0 24px rgba(255,176,32,0.35)",
       },
     },
   },

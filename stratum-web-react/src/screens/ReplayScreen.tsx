@@ -197,7 +197,7 @@ export const ReplayScreen = () => {
   }
 
   return (
-    <div className="relative h-[100dvh] w-full overflow-hidden bg-stratum-darker">
+    <div className="relative h-[100dvh] w-full overflow-hidden bg-ink">
       <div className="absolute inset-0">
         <LiveMap positions={positions} meName={selected} showControls={false} />
       </div>
@@ -215,7 +215,7 @@ export const ReplayScreen = () => {
       </div>
 
       {/* Bottom: transport controls + standings */}
-      <div className="absolute bottom-0 inset-x-0 z-[600] bg-stratum-darker/85 backdrop-blur-md border-t border-white/10">
+      <div className="absolute bottom-0 inset-x-0 z-[600] bg-ink/85 backdrop-blur-md border-t border-hairline">
         <div className="flex items-center gap-3 px-4 py-3">
           <button
             onClick={() => (playhead >= duration ? restart() : setPlaying((p) => !p))}
@@ -224,7 +224,7 @@ export const ReplayScreen = () => {
           >
             {playing ? <Pause size={18} /> : <Play size={18} className="ml-0.5" />}
           </button>
-          <button onClick={restart} className="w-9 h-9 shrink-0 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/70 hover:text-white" aria-label="Restart">
+          <button onClick={restart} className="w-9 h-9 shrink-0 rounded-full bg-ink-2 border border-hairline flex items-center justify-center text-white/70 hover:text-white" aria-label="Restart">
             <RotateCcw size={15} />
           </button>
           <div className="flex items-center gap-1 ml-auto">
@@ -233,7 +233,7 @@ export const ReplayScreen = () => {
                 key={s}
                 onClick={() => setRate(s)}
                 className={`stat-num text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
-                  rate === s ? "bg-white/[0.08] text-white border-white/20" : "bg-transparent text-white/45 border-white/8 hover:text-white/80"
+                  rate === s ? "bg-white/[0.08] text-white border-white/20" : "bg-transparent text-white/45 border-hairline hover:text-white/80"
                 }`}
               >
                 {s}×
@@ -250,7 +250,7 @@ export const ReplayScreen = () => {
                 key={name}
                 onClick={() => setSelected(name)}
                 className={`text-xs px-2.5 py-1 rounded-full border shrink-0 transition-colors ${
-                  selected === name ? "bg-stratum-violet/15 text-stratum-violet border-stratum-violet/30" : "bg-white/5 text-white/55 border-white/10 hover:text-white/80"
+                  selected === name ? "bg-amber/15 text-amber border-amber/30" : "bg-ink-2 text-white/55 border-hairline hover:text-white/80"
                 }`}
               >
                 {name}

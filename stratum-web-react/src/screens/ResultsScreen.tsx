@@ -75,8 +75,8 @@ export const ResultsScreen = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-stratum bg-stratum-darker">
-      <nav className="safe-top border-b border-white/[0.06]">
+    <div className="min-h-screen bg-ink">
+      <nav className="safe-top border-b border-hairline">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <button onClick={handleHome} className="btn-secondary">
             Back to Home
@@ -99,7 +99,7 @@ export const ResultsScreen = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
               <div className="lg:col-span-2 card">
                 <div className="flex items-center gap-4 mb-6">
-                  {isSolo ? <Navigation size={36} className="text-stratum-violet" /> : <Trophy size={40} className="text-stratum-violet" />}
+                  {isSolo ? <Navigation size={36} className="text-amber" /> : <Trophy size={40} className="text-amber" />}
                   <div>
                     <span className="eyebrow">{isSolo ? "Your drive" : "Winner"}</span>
                     <h3 className="display text-3xl">{winner?.display_name}</h3>
@@ -110,15 +110,15 @@ export const ResultsScreen = () => {
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-white/[0.03] border border-white/8 rounded-lg px-4 py-3">
+                  <div className="bg-ink-2 border border-hairline rounded-lg px-4 py-3">
                     <span className="eyebrow">Top Speed</span>
                     <strong className="stat-num text-2xl font-medium block mt-1">{winner?.top_speed_kmh} <span className="text-sm text-white/40">km/h</span></strong>
                   </div>
-                  <div className="bg-white/[0.03] border border-white/8 rounded-lg px-4 py-3">
+                  <div className="bg-ink-2 border border-hairline rounded-lg px-4 py-3">
                     <span className="eyebrow">Distance</span>
                     <strong className="stat-num text-2xl font-medium block mt-1">{((winner?.total_distance_m || 0) / 1000).toFixed(2)} <span className="text-sm text-white/40">km</span></strong>
                   </div>
-                  <div className="bg-white/[0.03] border border-white/8 rounded-lg px-4 py-3">
+                  <div className="bg-ink-2 border border-hairline rounded-lg px-4 py-3">
                     <span className="eyebrow">Avg Speed</span>
                     <strong className="stat-num text-2xl font-medium block mt-1">{winner?.average_speed_kmh} <span className="text-sm text-white/40">km/h</span></strong>
                   </div>
@@ -143,7 +143,7 @@ export const ResultsScreen = () => {
                   <button
                     onClick={handleDelete}
                     disabled={deleting}
-                    className="w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm text-red-300/90 bg-red-500/10 border border-red-500/20 hover:bg-red-500/15 transition-colors disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm text-negative bg-negative/10 border border-negative/20 hover:bg-negative/15 transition-colors disabled:opacity-50"
                   >
                     <Trash2 size={16} />
                     {deleting ? "Deleting…" : `Delete ${isSolo ? "drive" : "session"}`}
@@ -157,7 +157,7 @@ export const ResultsScreen = () => {
               <h3 className="font-semibold mb-4">Final Leaderboard</h3>
               <ol className="space-y-2">
                 {results.map((r) => (
-                  <li key={r.user_id} className="flex items-center justify-between bg-white/[0.03] border border-white/8 rounded-lg px-4 py-3">
+                  <li key={r.user_id} className="flex items-center justify-between bg-ink-2 border border-hairline rounded-lg px-4 py-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="stat-num w-5 shrink-0 text-center font-semibold text-white/40">{r.final_rank ?? "-"}</span>
                       <div className="min-w-0">
