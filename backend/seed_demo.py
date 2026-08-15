@@ -1,15 +1,16 @@
 """Seed a demo account with realistic drive history.
 
 Analytics, replay and the score panel all read from stored telemetry, so an
-empty account makes them impossible to evaluate. This generates a handful of
-finished drives with plausible GPS traces and lets the real scoring engine rank
-them, rather than writing made-up scores straight into the table.
+empty account makes them impossible to evaluate. This generates finished drives
+with plausible GPS traces and lets the real scoring engine rank them, rather
+than writing made-up scores straight into the table.
 
-    python seed_demo.py                      # default demo account
+    python seed_demo.py                      # solo drive history
+    python seed_demo.py --race               # + a 4-car race, Hitec City → Charminar
     python seed_demo.py --email you@x.app    # some other existing user
     python seed_demo.py --drives 12 --reset
 
-Safe to re-run: --reset removes only the drives this script created.
+Safe to re-run: --reset removes only the sessions this script created.
 """
 import argparse
 import math
@@ -32,9 +33,28 @@ from app.services import finalize_session_stats, recompute_user_stats
 
 # Marks the sessions this script owns, so --reset can find them again.
 SEED_TAG = "Demo drive"
+RACE_TAG = "Demo sprint"
 
 # Roughly central Hyderabad — drives radiate out from here.
 ORIGIN_LAT, ORIGIN_LNG = 17.4401, 78.3489
+
+# The demo race route: Hitec City → Charminar, via waypoints that keep the line
+# roughly on real roads instead of cutting straight across the city.
+ROUTE_A_TO_B = [
+    (17.4483, 78.3915),  # Hitec City
+    (17.4325, 78.4071),  # Jubilee Hills
+    (17.4156, 78.4347),  # Banjara Hills
+    (17.4062, 78.4691),  # Khairatabad
+    (17.3850, 78.4867),  # Nampally
+    (17.3616, 78.4747),  # Charminar
+]
+
+# The rivals. The demo account races against these three.
+RIVALS = [
+    ("nova", "Nova Reddy", "Subaru", "WRX", 2022, 271),
+    ("kestrel", "Kestrel Rao", "BMW", "M3", 2021, 473),
+    ("apex", "Apex Sharma", "Toyota", "Supra", 2023, 382),
+]
 
 
 def _leg(style: str) -> list[tuple[float, float]]:
@@ -146,11 +166,157 @@ def seed(email: str, count: int) -> None:
             # Let the real engine score it — no hand-written numbers.
             finalize_session_stats(drive.id, db)
             made += 1
-            print(f"  {drive.name:28s} {len(points):4d} points  {cum/1000:5.1f} km")
+            print(f"  {drive.name.replace(chr(0xB7), '-'):28s} {len(points):4d} points  {cum/1000:5.1f} km")
 
         recompute_user_stats(user.id, db)
         db.commit()
         print(f"\nSeeded {made} drives for {email}")
+
+
+def _interpolate_route(waypoints, samples: int, jitter: float, rng: random.Random):
+    """Walk the waypoint list, emitting `samples` evenly-spaced lat/lng pairs.
+
+    Each driver gets their own lane offset so four cars on the same road don't
+    render as one line stacked on itself.
+    """
+    legs = list(zip(waypoints, waypoints[1:]))
+    per_leg = max(2, samples // len(legs))
+    pts = []
+    for (alat, alng), (blat, blng) in legs:
+        for i in range(per_leg):
+            f = i / per_leg
+            # Ease within each leg so corners look driven, not teleported.
+            lat = alat + (blat - alat) * f
+            lng = alng + (blng - alng) * f
+            pts.append((lat + rng.gauss(0, jitter), lng + rng.gauss(0, jitter)))
+    return pts
+
+
+def seed_race(email: str) -> None:
+    """One race, four cars, Hitec City → Charminar.
+
+    Everyone drives the same route at different paces, so the replay has
+    overlapping trails, a real leaderboard and gaps that change over time —
+    which is what the post-drive screen is built to show.
+    """
+    from app.auth import get_password_hash
+
+    with new_session() as db:
+        host = db.exec(select(User).where(User.email == email)).first()
+        if not host:
+            raise SystemExit(f"No user with email {email!r} — sign up first.")
+
+        # Rivals are created directly rather than through /auth/signup, so this
+        # doesn't eat the signup rate limit and doesn't need the API running.
+        racers = [host]
+        for uname, display, make, model, year, hp in RIVALS:
+            u = db.exec(select(User).where(User.username == uname)).first()
+            if not u:
+                u = User(
+                    email=f"{uname}@stratum.app",
+                    username=uname,
+                    display_name=display,
+                    hashed_password=get_password_hash("stratum1234"),
+                )
+                db.add(u)
+                db.commit()
+                db.refresh(u)
+            if not db.exec(select(Vehicle).where(Vehicle.user_id == u.id)).first():
+                v = Vehicle(
+                    user_id=u.id, manufacturer=make, model=model, year=year,
+                    horsepower=hp, fuel_type="gasoline", transmission="Manual", is_active=True,
+                )
+                db.add(v)
+                db.commit()
+                db.refresh(v)
+                u.active_vehicle_id = v.id
+                db.add(u)
+                db.commit()
+            racers.append(u)
+
+        started = datetime.utcnow() - timedelta(hours=3)
+        race = SprintSession(
+            host_user_id=host.id,
+            name=f"{RACE_TAG} · Hitec City → Charminar",
+            room_code=f"SEED-{random.randint(1000, 9999)}",
+            visibility=Visibility.private,
+            max_players=6,
+            is_solo=False,
+            status=SessionStatus.live,
+            created_at=started,
+            started_at=started,
+        )
+        db.add(race)
+        db.commit()
+        db.refresh(race)
+
+        # Pace multiplier per car — the spread is what makes the gaps interesting.
+        paces = [1.0, 0.94, 1.07, 0.88]
+
+        for idx, racer in enumerate(racers):
+            vehicle = db.exec(select(Vehicle).where(Vehicle.user_id == racer.id)).first()
+            participant = SessionParticipant(
+                session_id=race.id, user_id=racer.id, vehicle_id=vehicle.id,
+                ready=True, joined_at=started,
+            )
+            db.add(participant)
+            db.commit()
+            db.refresh(participant)
+
+            rng = random.Random(1000 + idx)
+            pace = paces[idx % len(paces)]
+            # Lane offset keeps the four trails distinguishable on the map.
+            lane = (idx - 1.5) * 0.00018
+            samples = int(420 * pace)
+            path = _interpolate_route(ROUTE_A_TO_B, samples, 0.00006, rng)
+
+            t = started
+            cumulative = 0.0
+            prev = None
+            for i, (plat, plng) in enumerate(path):
+                plat += lane
+                plng += lane
+                step = 0.0
+                if prev:
+                    dlat = (plat - prev[0]) * 111_320
+                    dlng = (plng - prev[1]) * 111_320 * math.cos(math.radians(plat))
+                    step = math.hypot(dlat, dlng)
+                prev = (plat, plng)
+                cumulative += step
+
+                # Slow for the two mid-route junctions, quick on the open stretches.
+                phase = i / max(1, len(path))
+                base = 38 + 34 * math.sin(phase * math.pi * 3)
+                speed = max(0.0, (base + rng.gauss(0, 4)) / pace)
+
+                db.add(
+                    TelemetryPoint(
+                        session_id=race.id,
+                        participant_id=participant.id,
+                        timestamp=t,
+                        latitude=plat,
+                        longitude=plng,
+                        speed_kmh=speed,
+                        heading_deg=(math.degrees(math.atan2(1, 1)) + i * 0.7) % 360,
+                        distance_delta_m=step,
+                        cumulative_distance_m=cumulative,
+                        accuracy_m=rng.uniform(3, 8),
+                        altitude_m=500 + rng.uniform(-15, 15),
+                        g_force=abs(rng.gauss(0.1, 0.07)),
+                    )
+                )
+                t += timedelta(seconds=1)
+            db.commit()
+            print(f"  {racer.display_name:16s} {len(path):4d} points  {cumulative/1000:5.1f} km")
+
+        race.status = SessionStatus.ended
+        race.ended_at = started + timedelta(seconds=460)
+        db.add(race)
+        db.commit()
+        finalize_session_stats(race.id, db)
+
+        print(f"\nSeeded race #{race.id}: {race.name}")
+        print(f"  replay it at  /#/sessions/{race.id}/results")
 
 
 def reset(email: str) -> None:
@@ -160,7 +326,8 @@ def reset(email: str) -> None:
             raise SystemExit(f"No user with email {email!r}")
         drives = db.exec(
             select(SprintSession).where(
-                SprintSession.host_user_id == user.id, SprintSession.name.like(f"{SEED_TAG}%")
+                SprintSession.host_user_id == user.id,
+                SprintSession.name.like(f"{SEED_TAG}%") | SprintSession.name.like(f"{RACE_TAG}%"),
             )
         ).all()
         for d in drives:
@@ -179,9 +346,14 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--email", default="driver@stratum.app")
     ap.add_argument("--drives", type=int, default=8)
-    ap.add_argument("--reset", action="store_true", help="remove seeded drives first")
+    ap.add_argument("--reset", action="store_true", help="remove seeded sessions first")
+    ap.add_argument("--race", action="store_true", help="also seed a 4-car race")
+    ap.add_argument("--only-race", action="store_true", help="seed just the race")
     args = ap.parse_args()
 
     if args.reset:
         reset(args.email)
-    seed(args.email, args.drives)
+    if not args.only_race:
+        seed(args.email, args.drives)
+    if args.race or args.only_race:
+        seed_race(args.email)

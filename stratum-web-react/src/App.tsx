@@ -30,8 +30,7 @@ const CreateSessionScreen = lazy(() => import("./screens/CreateSessionScreen").t
 const JoinSessionScreen = lazy(() => import("./screens/JoinSessionScreen").then((m) => ({ default: m.JoinSessionScreen })))
 const LobbyScreen = lazy(() => import("./screens/LobbyScreen").then((m) => ({ default: m.LobbyScreen })))
 const LiveScreen = lazy(() => import("./screens/LiveScreen").then((m) => ({ default: m.LiveScreen })))
-const ResultsScreen = lazy(() => import("./screens/ResultsScreen").then((m) => ({ default: m.ResultsScreen })))
-const ReplayScreen = lazy(() => import("./screens/ReplayScreen").then((m) => ({ default: m.ReplayScreen })))
+const PostDriveScreen = lazy(() => import("./screens/PostDriveScreen").then((m) => ({ default: m.PostDriveScreen })))
 
 const Loading = () => (
   <div className="flex items-center justify-center h-[100dvh] text-white/50">Loading…</div>
@@ -109,8 +108,10 @@ function AppRoutes() {
           <Route path={routes.joinSession} element={<JoinSessionScreen />} />
           <Route path="/sessions/:sessionId/lobby" element={<LobbyScreen />} />
           <Route path="/sessions/:sessionId/live" element={<LiveScreen />} />
-          <Route path="/sessions/:sessionId/results" element={<ResultsScreen />} />
-          <Route path="/sessions/:sessionId/replay" element={<ReplayScreen />} />
+          {/* Results and replay are one screen — the drive ended, here's what
+              happened. /replay is kept so older shared links still resolve. */}
+          <Route path="/sessions/:sessionId/results" element={<PostDriveScreen />} />
+          <Route path="/sessions/:sessionId/replay" element={<PostDriveScreen />} />
         </Route>
 
         <Route path="*" element={<Navigate to={routes.landing} replace />} />
