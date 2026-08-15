@@ -6,9 +6,20 @@ import { routes } from "../routes"
 import { useRouteSession } from "../lib/useRouteSession"
 import { SessionEvent, useSessionSocket } from "../lib/useSessionSocket"
 import { LiveMap, MapPosition, AvatarInfo } from "../components/LiveMap"
-import { Standings } from "../components/Standings"
+import { RacerPanel } from "../components/RacerPanel"
+import { RacerCard } from "../components/RacerCard"
 import { TelemetryHUD, TelemetryFrame } from "../components/TelemetryHUD"
+import { fmtClock } from "../lib/format"
+import { useUnits } from "../lib/units"
+import { AnimatePresence } from "framer-motion"
 import { MapPin, ChevronDown, ChevronUp } from "lucide-react"
+
+interface RosterEntry {
+  displayName: string
+  avatarUrl?: string | null
+  /** "2024 Honda Civic" — shown on the selected racer's card. */
+  vehicleLabel?: string
+}
 
 interface DriverState {
   user: string
@@ -34,8 +45,30 @@ const distanceM = (a: GeolocationCoordinates, b: GeolocationCoordinates) => {
 
 const G = 9.80665 // m/s² — to convert accelerometer magnitude into g
 
+// Cap on stored breadcrumb points per racer. A long drive at ~1 Hz would grow
+// without bound and the polyline redraw cost grows with it; the oldest fixes
+// are the least interesting, so drop from the front.
+const MAX_TRAIL_POINTS = 600
+
+const appendFix = (
+  trails: Record<string, MapPosition[]>,
+  who: string,
+  fix: MapPosition
+): Record<string, MapPosition[]> => {
+  const existing = trails[who] ?? []
+  const last = existing[existing.length - 1]
+  // Skip fixes that haven't meaningfully moved (~1 m), so a parked car doesn't
+  // pile up thousands of identical points.
+  if (last && Math.abs(last.lat - fix.lat) < 1e-5 && Math.abs(last.lng - fix.lng) < 1e-5) {
+    return trails
+  }
+  const next = [...existing, fix]
+  return { ...trails, [who]: next.length > MAX_TRAIL_POINTS ? next.slice(-MAX_TRAIL_POINTS) : next }
+}
+
 export const LiveScreen = () => {
   const navigate = useNavigate()
+  const { toSpeed } = useUnits()
   const { id: routeSessionId, session: currentSession } = useRouteSession()
   const setCurrentSession = useAppStore((s) => s.setCurrentSession)
   const user = useAppStore((s) => s.user)
@@ -52,8 +85,15 @@ export const LiveScreen = () => {
   const [myPos, setMyPos] = useState<MapPosition | null>(null)
   const [needsMotionPermission, setNeedsMotionPermission] = useState(false)
   const [showBoard, setShowBoard] = useState(true)
-  const [roster, setRoster] = useState<Record<string, { displayName: string; avatarUrl?: string | null }>>({})
+  const [roster, setRoster] = useState<Record<string, RosterEntry>>({})
+  const [selected, setSelected] = useState<string | undefined>(undefined)
+  // Breadcrumb per racer, appended as fixes arrive, so the map can draw where
+  // everyone has actually been rather than just where they are.
+  const [trails, setTrails] = useState<Record<string, MapPosition[]>>({})
 
+  // Our own username, held in a ref so the geolocation callback can tag trail
+  // points without the watch being torn down and re-registered on every render.
+  const meRef = useRef<string | undefined>(undefined)
   const lastCoordRef = useRef<GeolocationCoordinates | null>(null)
   const cumulativeRef = useRef(0)
   const topSpeedRef = useRef(0)
@@ -122,9 +162,14 @@ export const LiveScreen = () => {
     sessions
       .participants(routeSessionId)
       .then((res) => {
-        const next: Record<string, { displayName: string; avatarUrl?: string | null }> = {}
-        for (const p of res.data as Array<{ username?: string; display_name?: string; profile_picture_url?: string | null }>) {
-          if (p.username) next[p.username] = { displayName: p.display_name || p.username, avatarUrl: p.profile_picture_url }
+        const next: Record<string, RosterEntry> = {}
+        for (const p of res.data as Array<{ username?: string; display_name?: string; profile_picture_url?: string | null; vehicle_label?: string | null }>) {
+          if (p.username)
+            next[p.username] = {
+              displayName: p.display_name || p.username,
+              avatarUrl: p.profile_picture_url,
+              vehicleLabel: p.vehicle_label ?? undefined,
+            }
         }
         setRoster(next)
       })
@@ -149,6 +194,9 @@ export const LiveScreen = () => {
             lng: longitude ?? prev[who]?.lng,
           },
         }))
+        if (latitude != null && longitude != null) {
+          setTrails((prev) => appendFix(prev, who, { lat: latitude, lng: longitude }))
+        }
       } else if (msg.event === "roster.changed") {
         loadRoster()
       } else if (msg.event === "session.ended") {
@@ -178,6 +226,12 @@ export const LiveScreen = () => {
           setMySpeed(Math.round(speedKmh))
           setMyDistance(Math.round(cumulativeRef.current))
           setMyPos({ lat: coords.latitude, lng: coords.longitude })
+          // Our own trail comes straight from the device rather than waiting
+          // for the broadcast to echo back.
+          if (meRef.current) {
+            const fix = { lat: coords.latitude, lng: coords.longitude }
+            setTrails((prev) => appendFix(prev, meRef.current as string, fix))
+          }
           setAltitude(coords.altitude)
           setHeading(coords.heading != null && !Number.isNaN(coords.heading) ? coords.heading : null)
           if (speedKmh > topSpeedRef.current) {
@@ -243,6 +297,16 @@ export const LiveScreen = () => {
   const leaderDistance = leaderboard[0]?.distance ?? 0
   const myName = user?.username
 
+  useEffect(() => {
+    meRef.current = myName
+  }, [myName])
+
+  // Default the selection to yourself once telemetry starts, so the map opens
+  // showing your own trail rather than nothing.
+  useEffect(() => {
+    if (!selected && myName && drivers[myName]) setSelected(myName)
+  }, [selected, myName, drivers])
+
   // F1 timing-tower style standings: for each racer, the gap to the leader and
   // the interval to the car directly ahead (both in metres, since the sprint is
   // won on distance covered).
@@ -284,24 +348,110 @@ export const LiveScreen = () => {
   const isHost = user?.id === currentSession?.host_user_id
   const isSolo = !!currentSession?.is_solo
 
-  return (
-    <div className="relative h-[100dvh] w-full overflow-hidden bg-ink">
-      {/* Map backdrop */}
-      <div className="absolute inset-0">
-        <LiveMap positions={mapPositions} meName={myName} avatars={avatars} showControls={false} />
-      </div>
+  // Live speed chip under each pin, as in the reference.
+  const badges: Record<string, string> = {}
+  for (const s of standings) badges[s.user] = `${toSpeed(s.speed)}`
+
+  const selectedRacer = standings.find((s) => s.user === selected)
+
+  const controls = (
+    <div className="flex gap-2">
+      {isSolo ? (
+        <button onClick={handleEnd} className="btn-primary flex-1">
+          End drive
+        </button>
+      ) : (
+        <>
+          <button onClick={handleLeave} className="btn-secondary flex-1">
+            Leave
+          </button>
+          {isHost && (
+            <button onClick={handleEnd} className="btn-primary flex-1">
+              End Session
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  )
+
+  const mapPane = (
+    <div className="relative h-full w-full">
+      <LiveMap
+        positions={mapPositions}
+        meName={myName}
+        avatars={avatars}
+        trails={trails}
+        badges={badges}
+        selected={selected}
+        onSelect={setSelected}
+        showControls={false}
+      />
 
       {!hasPositions && (
-        <div className="absolute inset-0 z-[400] pointer-events-none flex items-center justify-center">
+        <div className="pointer-events-none absolute inset-0 z-[400] flex items-center justify-center">
           <div className="text-center">
             <MapPin size={40} className="mx-auto mb-3 opacity-40" />
-            <p className="text-white/50 text-sm">Waiting for GPS positions…</p>
+            <p className="text-sm text-white/50">Waiting for GPS positions…</p>
           </div>
         </div>
       )}
 
-      {/* Top: telemetry HUD */}
-      <div className="absolute top-0 inset-x-0 z-[600]">
+      {/* Floating detail card for the picked racer. */}
+      <div className="pointer-events-none absolute right-4 top-4 z-[500] hidden md:block">
+        <AnimatePresence>
+          {selectedRacer && (
+            <div className="pointer-events-auto">
+              <RacerCard
+                racer={selectedRacer}
+                avatar={avatars[selectedRacer.user]}
+                isMe={selectedRacer.user === myName}
+                vehicleLabel={roster[selectedRacer.user]?.vehicleLabel}
+                onClose={() => setSelected(undefined)}
+              />
+            </div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="relative h-[100dvh] w-full overflow-hidden bg-ink md:flex">
+      {/* --- Desktop: roster rail beside the map ---------------------------- */}
+      <aside className="hidden w-[320px] shrink-0 flex-col border-r border-hairline bg-ink-1 md:flex">
+        <div className="safe-top px-4 pt-4">
+          <span className="eyebrow">{isSolo ? "Drive" : "Session"}</span>
+          <h1 className="display mt-1 truncate text-xl">{currentSession?.name || "Live"}</h1>
+          <div className="mt-2 flex items-center gap-2">
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${connected ? "live-dot bg-amber" : "bg-white/25"}`}
+            />
+            <span className="stat-num text-xs text-white/45">
+              {connected ? "Live" : "Reconnecting"} · {fmtClock(elapsedTime)}
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-4 min-h-0 flex-1">
+          <RacerPanel
+            racers={standings}
+            avatars={avatars}
+            meName={myName}
+            selected={selected}
+            onSelect={setSelected}
+            title={isSolo ? "You" : "Racers"}
+          />
+        </div>
+
+        <div className="border-t border-hairline p-4">{controls}</div>
+      </aside>
+
+      {/* --- Map ----------------------------------------------------------- */}
+      <div className="absolute inset-0 md:relative md:flex-1">{mapPane}</div>
+
+      {/* --- Mobile: HUD on top, sheet at the bottom ------------------------ */}
+      <div className="absolute inset-x-0 top-0 z-[600] md:hidden">
         <TelemetryHUD
           frame={frame}
           title={currentSession?.name}
@@ -312,58 +462,47 @@ export const LiveScreen = () => {
         {needsMotionPermission && (
           <button
             onClick={enableMotion}
-            className="w-full bg-amber/15 text-amber text-xs font-medium py-2 border-b border-amber/20"
+            className="w-full border-b border-amber/20 bg-amber/15 py-2 text-xs font-medium text-amber"
           >
             Tap to enable G-force (motion access)
           </button>
         )}
         {geoError && (
-          <div className="w-full bg-negative/15 text-negative text-xs py-2 px-4 text-center border-b border-negative/20">
+          <div className="w-full border-b border-negative/20 bg-negative/15 px-4 py-2 text-center text-xs text-negative">
             Location: {geoError} — allow location access and move to capture telemetry.
           </div>
         )}
       </div>
 
-      {/* Bottom: standings (races only) + controls */}
-      <div className="absolute bottom-0 inset-x-0 z-[600] bg-ink/85 backdrop-blur-md border-t border-hairline">
+      <div className="absolute inset-x-0 bottom-0 z-[600] border-t border-hairline bg-ink/90 backdrop-blur-md md:hidden">
         {!isSolo && (
           <>
             <button
               onClick={() => setShowBoard((s) => !s)}
-              className="w-full flex items-center justify-between px-4 py-3"
+              className="flex w-full items-center justify-between px-4 py-3"
             >
-              <span className="font-semibold text-sm">Leaderboard</span>
+              <span className="text-sm font-semibold">Leaderboard</span>
               <span className="flex items-center gap-1.5 text-xs text-white/45">
                 {myStanding ? `P${myStanding.position} / ${standings.length}` : "Gap · Interval"}
                 {showBoard ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
               </span>
             </button>
             {showBoard && (
-              <div className="px-4 pb-3 max-h-[38vh] overflow-y-auto">
-                <Standings standings={standings} myName={myName} avatars={avatars} />
+              <div className="max-h-[38vh] overflow-y-auto pb-3">
+                <RacerPanel
+                  racers={standings}
+                  avatars={avatars}
+                  meName={myName}
+                  selected={selected}
+                  onSelect={setSelected}
+                  title="Racers"
+                />
               </div>
             )}
           </>
         )}
 
-        <div className="flex gap-2 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+1.25rem)]">
-          {isSolo ? (
-            <button onClick={handleEnd} className="btn-primary flex-1">
-              End drive
-            </button>
-          ) : (
-            <>
-              <button onClick={handleLeave} className="btn-secondary flex-1">
-                Leave
-              </button>
-              {isHost && (
-                <button onClick={handleEnd} className="btn-primary flex-1">
-                  End Session
-                </button>
-              )}
-            </>
-          )}
-        </div>
+        <div className="px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+1.25rem)]">{controls}</div>
       </div>
     </div>
   )
