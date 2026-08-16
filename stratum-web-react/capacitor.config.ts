@@ -11,6 +11,11 @@ const config: CapacitorConfig = {
   android: {
     // Allow http:// to a LAN backend IP during dev (ngrok HTTPS needs no this).
     allowMixedContent: true,
+    // Required by @capacitor-community/background-geolocation: without the
+    // legacy bridge, Android stops delivering location updates after five
+    // minutes in the background — which is the exact failure we added the
+    // plugin to fix. See capacitor-community/background-geolocation#89.
+    useLegacyBridge: true,
   },
   plugins: {
     Geolocation: {

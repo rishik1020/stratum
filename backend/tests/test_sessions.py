@@ -7,7 +7,7 @@ import asyncio
 import os
 import sys
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -21,6 +21,7 @@ from sqlmodel import select  # noqa: E402
 from app.database import create_db_and_tables, new_session  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Session as SprintSession, SessionParticipant, SessionStatus, TelemetryPoint  # noqa: E402
+from app.routers.telemetry import _fix_time  # noqa: E402
 from app.services import close_abandoned_sessions  # noqa: E402
 from app.ws_manager import ConnectionManager  # noqa: E402
 
@@ -216,6 +217,52 @@ def test_one_dead_socket_does_not_silence_the_rest():
     # used to abort the loop before this one was ever reached.
     assert len(healthy_last.received) == 1, "a dead socket blocked delivery to racers behind it"
     assert dead not in manager.active_connections.get("7", []), "dead socket should be dropped"
+
+
+# --- Replayed telemetry keeps the time it was recorded ------------------------
+#
+# Phones lose the socket constantly, and Android throttles WebView network after
+# ~5 minutes in the background, so the client buffers fixes and replays them.
+# If those landed at arrival time, a drive's whole shape would be destroyed:
+# minutes of driving compressed into one instant, Δt ≈ 0 between points, and
+# every derived value — duration, acceleration, every score — computed from it.
+
+
+def test_a_replayed_fix_keeps_the_time_it_was_taken():
+    taken = datetime.utcnow() - timedelta(minutes=12)
+    assert _fix_time(taken) == taken
+
+
+def test_a_fix_with_no_timestamp_falls_back_to_now():
+    before = datetime.utcnow()
+    stamped = _fix_time(None)
+    assert before <= stamped <= datetime.utcnow()
+
+
+def test_a_timezone_aware_timestamp_is_normalised_not_rejected():
+    # Clients send ISO strings from Date.toISOString(), which carry a Z suffix.
+    # Comparing an aware datetime against a naive utcnow() raises, so if this
+    # regresses the whole telemetry write fails rather than degrading.
+    aware = datetime.now(timezone.utc) - timedelta(minutes=3)
+    stamped = _fix_time(aware)
+    assert stamped.tzinfo is None
+    assert abs((stamped - aware.replace(tzinfo=None)).total_seconds()) < 1
+
+
+def test_a_wildly_wrong_device_clock_is_not_believed():
+    # Phone clocks can be set by hand. A fix claiming next week would sort ahead
+    # of everything and stretch the drive's duration arbitrarily.
+    now = datetime.utcnow()
+    assert _fix_time(now + timedelta(days=7)) >= now
+    assert _fix_time(now - timedelta(days=7)) >= now
+
+
+def test_a_replayed_burst_still_spans_real_time():
+    """The property that actually matters, end to end."""
+    origin = datetime.utcnow() - timedelta(minutes=10)
+    stamps = [_fix_time(origin + timedelta(seconds=i)) for i in range(0, 300, 5)]
+    span = (max(stamps) - min(stamps)).total_seconds()
+    assert span > 290, f"replayed burst collapsed to {span:.0f}s"
 
 
 if __name__ == "__main__":

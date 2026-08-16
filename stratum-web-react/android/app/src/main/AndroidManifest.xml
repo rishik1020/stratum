@@ -34,6 +34,14 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!--
+            The foreground service that keeps a drive recording once the screen
+            goes off is declared by @capacitor-community/background-geolocation
+            and merged in from its own manifest — do not redeclare it here. A
+            second <service> entry that disagrees on android:exported fails the
+            manifest merge outright.
+        -->
     </application>
 
     <!-- Permissions -->
@@ -43,6 +51,18 @@
     <!-- Location: precise GPS for live telemetry & drive scoring. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!--
+        Recording with the screen off is handled by a foreground service of type
+        "location" (declared by the plugin). While that service runs Android
+        counts the app as in-use, so ordinary "while using the app" location is
+        enough and ACCESS_BACKGROUND_LOCATION is deliberately NOT requested — it
+        would add a second, harder "Allow all the time" prompt and a Play Store
+        policy declaration for a capability this app doesn't need.
+
+        FOREGROUND_SERVICE / FOREGROUND_SERVICE_LOCATION (Android 14+) and
+        POST_NOTIFICATIONS (Android 13+, for the ongoing recording notification)
+        also arrive via the plugin's manifest.
+    -->
     <!-- Motion sensors (accelerometer/gyroscope) need no runtime permission. -->
 
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />

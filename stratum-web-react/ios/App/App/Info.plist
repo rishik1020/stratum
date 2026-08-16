@@ -53,5 +53,13 @@
 	<string>Stratum uses your location to keep recording your drive, including when the app is in the background.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Stratum reads motion sensors (accelerometer/gyroscope) to measure g-force, braking, and cornering.</string>
+	<!-- Lets iOS keep delivering location after the screen locks. The
+	     NSLocationAlwaysAndWhenInUse string above is only half of it: without
+	     this background mode the OS suspends the app and the drive stops
+	     recording the moment the phone is pocketed. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 </dict>
 </plist>

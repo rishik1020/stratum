@@ -5,6 +5,14 @@ import { sessions } from "../api"
 import { routes } from "../routes"
 import { useRouteSession } from "../lib/useRouteSession"
 import { SessionEvent, useSessionSocket } from "../lib/useSessionSocket"
+import {
+  Fix,
+  Tracker,
+  createWakeLock,
+  haversineM,
+  startTracking,
+  webBackgroundLimitation,
+} from "../lib/tracking"
 import { LiveMap, MapPosition, AvatarInfo } from "../components/LiveMap"
 import { RacerPanel } from "../components/RacerPanel"
 import { RacerCard } from "../components/RacerCard"
@@ -27,20 +35,6 @@ interface DriverState {
   speed: number
   lat?: number
   lng?: number
-}
-
-// Haversine distance between two lat/lng points, in metres.
-const distanceM = (a: GeolocationCoordinates, b: GeolocationCoordinates) => {
-  const R = 6371000
-  const toRad = (d: number) => (d * Math.PI) / 180
-  const dLat = toRad(b.latitude - a.latitude)
-  const dLng = toRad(b.longitude - a.longitude)
-  const lat1 = toRad(a.latitude)
-  const lat2 = toRad(b.latitude)
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2
-  return 2 * R * Math.asin(Math.sqrt(h))
 }
 
 const G = 9.80665 // m/s² — to convert accelerometer magnitude into g
@@ -94,7 +88,7 @@ export const LiveScreen = () => {
   // Our own username, held in a ref so the geolocation callback can tag trail
   // points without the watch being torn down and re-registered on every render.
   const meRef = useRef<string | undefined>(undefined)
-  const lastCoordRef = useRef<GeolocationCoordinates | null>(null)
+  const lastCoordRef = useRef<Fix | null>(null)
   const cumulativeRef = useRef(0)
   const topSpeedRef = useRef(0)
   const gForceRef = useRef(0)
@@ -206,63 +200,73 @@ export const LiveScreen = () => {
     [loadRoster, navigate, routeSessionId]
   )
 
-  const { connected, send } = useSessionSocket(routeSessionId, handleEvent)
+  const { connected, send, queuedCount } = useSessionSocket(routeSessionId, handleEvent)
 
-  // Geolocation → telemetry frames on the shared socket.
+  // Location → telemetry frames on the shared socket.
+  //
+  // Goes through `startTracking` rather than watchPosition directly: on a phone
+  // that means an Android foreground service, so the drive keeps recording with
+  // the screen off. In a browser it's still watchPosition and still stops when
+  // you leave the tab — hence the wake lock, and the warning in the UI.
   useEffect(() => {
-    let watchId: number | null = null
-    if ("geolocation" in navigator) {
-      watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-          const coords = pos.coords
-          const last = lastCoordRef.current
-          let delta = 0
-          if (last) delta = distanceM(last, coords)
-          lastCoordRef.current = coords
-          cumulativeRef.current += delta
+    let tracker: Tracker | null = null
+    let stopped = false
+    const wakeLock = createWakeLock()
 
-          // coords.speed is m/s and may be null indoors; fall back to 0.
-          const speedKmh = coords.speed != null ? Math.max(0, coords.speed * 3.6) : 0
-          setMySpeed(Math.round(speedKmh))
-          setMyDistance(Math.round(cumulativeRef.current))
-          setMyPos({ lat: coords.latitude, lng: coords.longitude })
-          // Our own trail comes straight from the device rather than waiting
-          // for the broadcast to echo back.
-          if (meRef.current) {
-            const fix = { lat: coords.latitude, lng: coords.longitude }
-            setTrails((prev) => appendFix(prev, meRef.current as string, fix))
-          }
-          setAltitude(coords.altitude)
-          setHeading(coords.heading != null && !Number.isNaN(coords.heading) ? coords.heading : null)
-          if (speedKmh > topSpeedRef.current) {
-            topSpeedRef.current = speedKmh
-            setTopSpeed(Math.round(speedKmh))
-          }
+    void startTracking({
+      notificationText: "Recording your drive",
+      onError: (message) => setGeoError(message),
+      onFix: (fix) => {
+        const last = lastCoordRef.current
+        const delta = last ? haversineM(last, fix) : 0
+        lastCoordRef.current = fix
+        cumulativeRef.current += delta
 
-          send({
-            event: "telemetry.update",
-            payload: {
-              latitude: coords.latitude,
-              longitude: coords.longitude,
-              speed_kmh: speedKmh,
-              heading_deg: coords.heading,
-              distance_delta_m: delta,
-              cumulative_distance_m: cumulativeRef.current,
-              accuracy_m: coords.accuracy,
-              altitude_m: coords.altitude,
-              g_force: gForceRef.current || null,
-            },
-          })
-        },
-        (err) => setGeoError(err.message || "Location unavailable"),
-        { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
-      )
-    } else {
-      setGeoError("Geolocation not supported by this browser")
-    }
+        const speedKmh = fix.speedKmh ?? 0
+        setMySpeed(Math.round(speedKmh))
+        setMyDistance(Math.round(cumulativeRef.current))
+        setMyPos({ lat: fix.latitude, lng: fix.longitude })
+        // Our own trail comes straight from the device rather than waiting
+        // for the broadcast to echo back.
+        if (meRef.current) {
+          const point = { lat: fix.latitude, lng: fix.longitude }
+          setTrails((prev) => appendFix(prev, meRef.current as string, point))
+        }
+        setAltitude(fix.altitudeM)
+        setHeading(fix.headingDeg)
+        if (speedKmh > topSpeedRef.current) {
+          topSpeedRef.current = speedKmh
+          setTopSpeed(Math.round(speedKmh))
+        }
+
+        send({
+          event: "telemetry.update",
+          payload: {
+            latitude: fix.latitude,
+            longitude: fix.longitude,
+            speed_kmh: speedKmh,
+            heading_deg: fix.headingDeg,
+            distance_delta_m: delta,
+            cumulative_distance_m: cumulativeRef.current,
+            accuracy_m: fix.accuracyM,
+            altitude_m: fix.altitudeM,
+            g_force: gForceRef.current || null,
+            // Stamped on the device. Frames queued while the socket was down
+            // replay later, and without this they'd all land at flush time —
+            // collapsing minutes of driving into one instant.
+            recorded_at: fix.recordedAt.toISOString(),
+          },
+        })
+      },
+    }).then((t) => {
+      if (stopped) void t.stop()
+      else tracker = t
+    })
 
     return () => {
-      if (watchId != null) navigator.geolocation.clearWatch(watchId)
+      stopped = true
+      void tracker?.stop()
+      void wakeLock.release()
     }
   }, [send])
 
@@ -439,6 +443,9 @@ export const LiveScreen = () => {
             />
             <span className="stat-num text-xs text-white/45">
               {connected ? "Live" : "Reconnecting"} · {fmtClock(elapsedTime)}
+              {/* Losing the socket no longer loses the drive — say so, or a
+                  driver watching "Reconnecting" assumes it's being thrown away. */}
+              {queuedCount > 0 && ` · ${queuedCount} held`}
             </span>
           </div>
         </div>
@@ -480,6 +487,20 @@ export const LiveScreen = () => {
         {geoError && (
           <div className="w-full border-b border-negative/20 bg-negative/15 px-4 py-2 text-center text-xs text-negative">
             Location: {geoError} — allow location access and move to capture telemetry.
+          </div>
+        )}
+        {/* A browser tab cannot track in the background, whatever we do here.
+            Better they hear it from us now than discover it from a drive that
+            recorded three minutes of a forty-minute trip. */}
+        {webBackgroundLimitation && !geoError && (
+          <div className="w-full border-b border-hairline bg-ink/85 px-4 py-2 text-center text-[11px] text-white/50">
+            Keep this tab open — browsers stop recording when you switch away. The
+            Android app keeps going with the screen off.
+          </div>
+        )}
+        {queuedCount > 0 && (
+          <div className="w-full border-b border-amber/20 bg-amber/10 px-4 py-2 text-center text-[11px] text-amber">
+            Offline — {queuedCount} fixes held, they’ll upload when you reconnect.
           </div>
         )}
       </div>

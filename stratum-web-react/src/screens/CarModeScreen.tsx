@@ -7,6 +7,7 @@ import { routes } from "../routes"
 import { useAppStore } from "../store"
 import { useRouteSession } from "../lib/useRouteSession"
 import { SessionEvent, useSessionSocket } from "../lib/useSessionSocket"
+import { Fix, Tracker, createWakeLock, haversineM, startTracking } from "../lib/tracking"
 import { useUnits } from "../lib/units"
 import { CarDashboard, DashboardState } from "../components/CarDashboard"
 import { MapPosition, AvatarInfo } from "../components/LiveMap"
@@ -40,7 +41,7 @@ export const CarModeScreen = () => {
 
   const myName = user?.username
   const meRef = useRef<string | undefined>(undefined)
-  const lastCoord = useRef<GeolocationCoordinates | null>(null)
+  const lastCoord = useRef<Fix | null>(null)
   const cumulative = useRef(0)
 
   useEffect(() => {
@@ -111,51 +112,56 @@ export const CarModeScreen = () => {
     }
   }, [sessionId])
 
-  // Own GPS → telemetry, same as the live screen.
+  // Own GPS → telemetry, same as the live screen: background service on a
+  // phone, watchPosition on the web. Car mode is the mount-on-the-dash view, so
+  // the wake lock matters here more than anywhere — the screen going dark
+  // mid-drive is the whole failure mode.
   useEffect(() => {
-    if (!("geolocation" in navigator)) return
-    const watch = navigator.geolocation.watchPosition(
-      (pos) => {
-        const c = pos.coords
+    let tracker: Tracker | null = null
+    let stopped = false
+    const wakeLock = createWakeLock()
+
+    void startTracking({
+      notificationText: "Recording your drive",
+      onError: () => {},
+      onFix: (fix) => {
         const last = lastCoord.current
-        let delta = 0
-        if (last) {
-          const R = 6371000
-          const toRad = (d: number) => (d * Math.PI) / 180
-          const dLat = toRad(c.latitude - last.latitude)
-          const dLng = toRad(c.longitude - last.longitude)
-          const h =
-            Math.sin(dLat / 2) ** 2 +
-            Math.cos(toRad(last.latitude)) * Math.cos(toRad(c.latitude)) * Math.sin(dLng / 2) ** 2
-          delta = 2 * R * Math.asin(Math.sqrt(h))
-        }
-        lastCoord.current = c
+        const delta = last ? haversineM(last, fix) : 0
+        lastCoord.current = fix
         cumulative.current += delta
-        const kmh = c.speed != null ? Math.max(0, c.speed * 3.6) : 0
+        const kmh = fix.speedKmh ?? 0
         setSpeed(Math.round(kmh))
         setDistance(Math.round(cumulative.current))
         if (meRef.current) {
-          setPositions((p) => ({ ...p, [meRef.current as string]: { lat: c.latitude, lng: c.longitude } }))
-          appendFix(meRef.current, { lat: c.latitude, lng: c.longitude })
+          const point = { lat: fix.latitude, lng: fix.longitude }
+          setPositions((p) => ({ ...p, [meRef.current as string]: point }))
+          appendFix(meRef.current, point)
         }
         send({
           event: "telemetry.update",
           payload: {
-            latitude: c.latitude,
-            longitude: c.longitude,
+            latitude: fix.latitude,
+            longitude: fix.longitude,
             speed_kmh: kmh,
-            heading_deg: c.heading,
+            heading_deg: fix.headingDeg,
             distance_delta_m: delta,
             cumulative_distance_m: cumulative.current,
-            accuracy_m: c.accuracy,
-            altitude_m: c.altitude,
+            accuracy_m: fix.accuracyM,
+            altitude_m: fix.altitudeM,
+            recorded_at: fix.recordedAt.toISOString(),
           },
         })
       },
-      () => {},
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
-    )
-    return () => navigator.geolocation.clearWatch(watch)
+    }).then((t) => {
+      if (stopped) void t.stop()
+      else tracker = t
+    })
+
+    return () => {
+      stopped = true
+      void tracker?.stop()
+      void wakeLock.release()
+    }
   }, [send, appendFix])
 
   const avatars: Record<string, AvatarInfo> = {}
