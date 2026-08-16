@@ -8,22 +8,41 @@ deterministic half of 9 (AI Coach insights) from the analytics design.
 Input: an iterable of point-like objects exposing
     timestamp (datetime), speed_kmh (float), and optionally
     heading_deg, latitude, longitude, cumulative_distance_m, distance_delta_m.
+
+Real road speed limits come from `app.speed_limits`, which does the (impure)
+map-matching and passes the result in as a plain parallel list — the map lookup
+lives outside so this module stays pure.
 """
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Sequence
 
 # --- Tunable thresholds (see ANALYTICS_ARCHITECTURE.md §3) --------------------
 MOVING_MS = 3 / 3.6              # 3 km/h in m/s — below this the car is "idle"
 HARSH_BRAKE_MS2 = -3.0           # ≈ -0.31 g
 RAPID_ACCEL_MS2 = 2.8            # ≈ 0.29 g
 SHARP_CORNER_MS2 = 4.0          # lateral accel ≈ 0.41 g (needs heading)
-DEFAULT_SPEED_LIMIT_KMH = 120.0  # placeholder until road speed limits are map-matched
 MIN_DT = 0.1                     # clamp tiny Δt so derived accel doesn't explode
 DAY_START_HOUR, DAY_END_HOUR = 6, 18
+
+# The limit assumed when no road could be matched at all — Overpass unreachable,
+# or a drive somewhere OSM has no roads for. Deliberately lenient: if we don't
+# know what road someone was on, we must not accuse them of speeding on it.
+UNKNOWN_LIMIT_KMH = 120.0
+
+# Nobody is "speeding" at 3 km/h over. Consumer GPS speed carries a couple of
+# km/h of error, speedometers read high by design, and OSM limits are
+# approximate. Flag only past a tolerance — the larger of a flat margin and a
+# fraction of the limit, so it scales from a 20 km/h lane to a motorway.
+SPEEDING_TOLERANCE_KMH = 5.0
+SPEEDING_TOLERANCE_FRAC = 0.07
+
+# Fraction over the limit at which the speeding penalty saturates. 0.5 means
+# 60 in a 40 zone is as bad as the model gets — beyond that it's already maxed.
+SPEEDING_SEVERITY_FULL = 0.5
 
 # Rough fuel economy fallback by fuel type (L/100km); overridden by real vehicle data.
 _ECON_BY_FUEL = {"gasoline": 8.5, "petrol": 8.5, "diesel": 6.5, "hybrid": 5.0}
@@ -40,6 +59,10 @@ class _P:
     delta: Optional[float]
     lat: Optional[float]
     lng: Optional[float]
+    # The limit on the road under *this* point. Carried on the point rather than
+    # passed alongside, because _prepare sorts by timestamp — a parallel list
+    # would silently pair each limit with the wrong point.
+    limit_ms: float = UNKNOWN_LIMIT_KMH / 3.6
 
 
 @dataclass
@@ -73,6 +96,16 @@ class EventCounts:
     sharp_cornering: int = 0
     speeding_seconds: float = 0.0
     speeding_ratio: float = 0.0
+    # How far over, not just how long. Time-weighted mean of "fraction over the
+    # limit", normalised so 1.0 means the whole drive was at or past
+    # SPEEDING_SEVERITY_FULL. Without this, 1 km/h over scores the same as 50.
+    speeding_severity: float = 0.0
+    # The worst single moment, km/h over the limit — the number a driver
+    # actually recognises from their own drive.
+    max_over_limit_kmh: float = 0.0
+    # Whether real map-matched limits were used, or the flat fallback. Surfaced
+    # so the UI never presents a guess as a measurement.
+    limits_matched: bool = False
 
 
 @dataclass
@@ -135,10 +168,22 @@ def _percentile(xs: List[float], p: float) -> float:
     return s[lo] * (hi - k) + s[hi] * (k - lo)
 
 
-def _prepare(points: Iterable) -> List[_P]:
+def _prepare(points: Iterable, speed_limits: Optional[Sequence[float]] = None) -> List[_P]:
+    """Normalise points, attaching each one's speed limit before sorting.
+
+    `speed_limits` is parallel to `points` in the order given. It's zipped in
+    here rather than used later precisely because of the sort below: pairing a
+    sorted point list against an unsorted limit list would quietly score every
+    point against the wrong road.
+    """
     prepared: List[_P] = []
-    for p in points:
+    limits = list(speed_limits) if speed_limits is not None else None
+    for i, p in enumerate(points):
         ts: datetime = p.timestamp
+        if limits is not None and i < len(limits) and limits[i] and limits[i] > 0:
+            limit_ms = limits[i] / 3.6
+        else:
+            limit_ms = UNKNOWN_LIMIT_KMH / 3.6
         prepared.append(
             _P(
                 t=ts.timestamp(),
@@ -149,6 +194,7 @@ def _prepare(points: Iterable) -> List[_P]:
                 delta=getattr(p, "distance_delta_m", None),
                 lat=getattr(p, "latitude", None),
                 lng=getattr(p, "longitude", None),
+                limit_ms=limit_ms,
             )
         )
     prepared.sort(key=lambda x: x.t)
@@ -229,16 +275,21 @@ def compute_metrics(pts: List[_P], fuel_type: Optional[str], econ_l_per_100km: O
     )
 
 
-def _derive(pts: List[_P], speed_limit_kmh: float):
-    """Return (events, accels, jerks, smooth_segments, total_segments)."""
-    events = EventCounts()
+def _derive(pts: List[_P], limits_matched: bool):
+    """Return (events, accels, jerks, smooth_segments, total_segments).
+
+    Each segment is judged against the limit on the road under its *start*
+    point, so a drive that moves between a 30 zone and a motorway is scored
+    against each road in turn rather than one blended number.
+    """
+    events = EventCounts(limits_matched=limits_matched)
     accels: List[float] = []
     jerks: List[float] = []
     smooth_segments = 0
     total_segments = 0
     duration = max(0.0, pts[-1].t - pts[0].t)
     prev_a: Optional[float] = None
-    limit_ms = speed_limit_kmh / 3.6
+    severity_seconds = 0.0
 
     for a, b in zip(pts, pts[1:]):
         dt_raw = b.t - a.t
@@ -254,9 +305,21 @@ def _derive(pts: List[_P], speed_limit_kmh: float):
         if accel >= RAPID_ACCEL_MS2:
             events.rapid_acceleration += 1
 
-        over = a.speed_ms > limit_ms
+        # Speeding, judged past a tolerance and weighted by how far over.
+        limit_ms = a.limit_ms
+        threshold = limit_ms + max(
+            SPEEDING_TOLERANCE_KMH / 3.6, limit_ms * SPEEDING_TOLERANCE_FRAC
+        )
+        over = a.speed_ms > threshold
         if over:
             events.speeding_seconds += dt_raw
+            # Measured from the limit itself, not the tolerated threshold — the
+            # tolerance decides *whether* to count it, not how badly.
+            excess = (a.speed_ms - limit_ms) / limit_ms if limit_ms > 0 else 0.0
+            severity_seconds += dt_raw * min(1.0, excess / SPEEDING_SEVERITY_FULL)
+            events.max_over_limit_kmh = max(
+                events.max_over_limit_kmh, (a.speed_ms - limit_ms) * 3.6
+            )
 
         if a.heading is not None and b.heading is not None:
             yaw_rate = math.radians(_heading_delta(b.heading, a.heading)) / dt
@@ -271,7 +334,11 @@ def _derive(pts: List[_P], speed_limit_kmh: float):
         if abs(accel) < 1.0 and not over:
             smooth_segments += 1
 
-    events.speeding_ratio = round(events.speeding_seconds / duration, 3) if duration > 0 else 0.0
+    if duration > 0:
+        events.speeding_ratio = round(events.speeding_seconds / duration, 3)
+        events.speeding_severity = round(severity_seconds / duration, 3)
+    events.speeding_seconds = round(events.speeding_seconds, 1)
+    events.max_over_limit_kmh = round(events.max_over_limit_kmh, 1)
     return events, accels, jerks, smooth_segments, total_segments
 
 
@@ -285,7 +352,12 @@ def compute_scores(metrics: DriveMetrics, events: EventCounts, accels: List[floa
     idle_ratio = metrics.idle_time_s / duration
 
     # Safety: penalize aggressive, illegal, and abrupt inputs (per km).
-    safety = _clamp(100 - (7 * hb + 5 * ra + 9 * sc + 30 * events.speeding_ratio))
+    #
+    # Speeding counts twice over: how long you were over the limit, and how far
+    # over you went. Duration alone made 1 km/h over cost the same as 50, which
+    # only survived as long as the limit was a flat 120 nobody ever reached.
+    speeding_penalty = 20 * events.speeding_ratio + 30 * events.speeding_severity
+    safety = _clamp(100 - (7 * hb + 5 * ra + 9 * sc + speeding_penalty))
 
     # Eco: reward smooth throttle, low idle; penalize harsh events.
     accel_std = _std(accels)
@@ -329,7 +401,13 @@ def build_insights(metrics: DriveMetrics, events: EventCounts, score: DriveScore
         recommendations.append("Carry less speed into corners for a cleaner, smoother line.")
     if events.speeding_ratio > 0.05:
         pct = round(events.speeding_ratio * 100)
-        explanations.append(f"Safety reduced — over the limit for ~{pct}% of the drive.")
+        over = round(events.max_over_limit_kmh)
+        # Only name a number when it came from a real road; otherwise the copy
+        # would dress the flat fallback up as a measurement.
+        peak = f", peaking at {over} km/h over" if events.limits_matched and over > 0 else ""
+        explanations.append(
+            f"Safety reduced — over the limit for ~{pct}% of the drive{peak}."
+        )
         recommendations.append("Keep within posted limits to protect your Safety score.")
     if metrics.idle_time_s > 0 and metrics.duration_s > 0 and metrics.idle_time_s / metrics.duration_s > 0.2:
         pct = round(metrics.idle_time_s / metrics.duration_s * 100)
@@ -380,14 +458,24 @@ def analyze_drive(
     points: Iterable,
     fuel_type: Optional[str] = None,
     econ_l_per_100km: Optional[float] = None,
-    speed_limit_kmh: float = DEFAULT_SPEED_LIMIT_KMH,
+    speed_limits: Optional[Sequence[float]] = None,
 ) -> DriveAnalytics:
-    pts = _prepare(points)
+    """Score one drive.
+
+    `speed_limits` is the road limit in km/h under each point, parallel to
+    `points` in the order given — see `app.speed_limits.limits_for_telemetry`.
+    Pass None and every point falls back to `UNKNOWN_LIMIT_KMH`, which is
+    lenient by design: a drive should never be penalised for roads we couldn't
+    identify.
+    """
+    pts = _prepare(points, speed_limits)
     if len(pts) < 2 or (pts[-1].t - pts[0].t) <= 0:
         return _empty("insufficient_data")
 
     metrics = compute_metrics(pts, fuel_type, econ_l_per_100km)
-    events, accels, jerks, smooth_segments, total_segments = _derive(pts, speed_limit_kmh)
+    events, accels, jerks, smooth_segments, total_segments = _derive(
+        pts, limits_matched=speed_limits is not None
+    )
     score = compute_scores(metrics, events, accels, jerks)
     insights = build_insights(metrics, events, score, smooth_segments, total_segments)
     return DriveAnalytics(status="ok", metrics=metrics, events=events, score=score, insights=insights)

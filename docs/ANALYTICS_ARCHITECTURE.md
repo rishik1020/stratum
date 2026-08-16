@@ -124,7 +124,13 @@ start/end geo, fuel & CO₂ estimates (vehicle efficiency × distance), elevatio
 gain/loss (needs altitude — flagged when unavailable).
 
 **Subscores (0–100), per-distance-normalized so length is fair:**
-- **Safety** = 100 − penalties(harsh_brake, rapid_accel, speeding_ratio, sharp_corner) per km.
+- **Safety** = 100 − penalties(harsh_brake, rapid_accel, sharp_corner) per km − speeding.
+  Speeding counts twice over: `20·speeding_ratio` (how long) + `30·speeding_severity`
+  (how far over, saturating at 50% above the limit). Duration alone made 1 km/h over
+  cost the same as 50, which only passed unnoticed while the "limit" was a flat 120
+  nobody reached. A tolerance of max(5 km/h, 7%) applies first, because GPS error and
+  speedometer bias otherwise flag every drive ever taken. Limits are map-matched per
+  point — see `backend/app/speed_limits.py`.
 - **Eco** = rewards smooth throttle (low |a| variance), low idle ratio, efficient cruise band, penalizes harsh accel.
 - **Comfort** = rewards low jerk, low speed σ, consistent inputs.
 - **Performance** = rewards strong-but-smooth acceleration, high speed maintenance/consistency, clean cornering.

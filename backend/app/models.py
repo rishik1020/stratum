@@ -121,3 +121,27 @@ class TelemetryPoint(SQLModel, table=True):
     # Phone-derived extras for the telemetry HUD (GPS altitude, DeviceMotion g-force).
     altitude_m: Optional[float] = None
     g_force: Optional[float] = None
+
+
+class RoadTile(SQLModel, table=True):
+    """Cached OpenStreetMap road geometry + speed limits for one map tile.
+
+    Scoring needs to know the speed limit under every GPS point, which means
+    asking Overpass — a free, rate-limited public service — about the roads in
+    an area. People drive the same roads daily, so we cache by tile rather than
+    by drive: the second trip down your street costs nothing and puts no load on
+    someone else's server.
+
+    `ways_json` is a JSON array of `{"limit": kmh, "geom": [[lat, lng], ...]}`.
+    Denormalised on purpose — this is a cache, and one row per tile is far
+    cheaper to read than reassembling thousands of segment rows. See
+    `app/speed_limits.py`.
+    """
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    # "<lat_index>:<lng_index>" at speed_limits.TILE_DEG resolution.
+    tile_key: str = Field(index=True, unique=True)
+    lat0: float
+    lng0: float
+    ways_json: str
+    fetched_at: datetime = Field(default_factory=datetime.utcnow)

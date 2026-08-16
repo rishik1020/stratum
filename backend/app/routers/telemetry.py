@@ -1,6 +1,7 @@
 """Telemetry: the live WebSocket stream, the stored series, and drive analytics."""
 import json
-from typing import List
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from sqlmodel import Session, select
@@ -11,9 +12,34 @@ from app.database import get_session, new_session
 from app.deps import own_participation, user_may_view_session, visible_session
 from app.models import Session as SprintSession, SessionParticipant, TelemetryPoint, User, Vehicle
 from app.schemas import DriveAnalyticsSchema, TelemetrySchema, TelemetrySeriesPoint
+from app.speed_limits import limits_for_telemetry, warm_tile
 from app.ws_manager import manager
 
 router = APIRouter(tags=["telemetry"])
+
+# How far a device clock may disagree with ours before we stop believing it.
+# Phone clocks drift and can be set by hand; a fix claiming to be from next week
+# would sort ahead of everything and stretch the drive's duration arbitrarily.
+MAX_CLOCK_SKEW = timedelta(minutes=5)
+MAX_BUFFER_AGE = timedelta(hours=6)
+
+
+def _fix_time(recorded_at: Optional[datetime]) -> datetime:
+    """When a fix was taken, per the device — within reason.
+
+    The client buffers telemetry across dropped sockets and replays it, so
+    arrival order says nothing about when a fix happened. We take the device's
+    word for it, but only inside a sane window: outside that we fall back to
+    now, which is wrong but bounded.
+    """
+    now = datetime.utcnow()
+    if recorded_at is None:
+        return now
+    if recorded_at.tzinfo is not None:
+        recorded_at = recorded_at.astimezone(timezone.utc).replace(tzinfo=None)
+    if recorded_at > now + MAX_CLOCK_SKEW or recorded_at < now - MAX_BUFFER_AGE:
+        return now
+    return recorded_at
 
 
 @router.get("/sessions/{session_id}/drive-analytics", response_model=DriveAnalyticsSchema)
@@ -29,7 +55,15 @@ def drive_analytics(
         .order_by(TelemetryPoint.timestamp)
     ).all()
     vehicle = db.get(Vehicle, participant.vehicle_id)
-    return analyze_to_dict(points, fuel_type=vehicle.fuel_type if vehicle else None)
+    # Road limits are normally already cached by the end-of-drive rollup, so
+    # this is usually a local read. The short budget is for the case where it
+    # isn't — nobody should stare at a spinner because Overpass is slow.
+    limits = limits_for_telemetry(points, db, budget_s=6.0)
+    return analyze_to_dict(
+        points,
+        fuel_type=vehicle.fuel_type if vehicle else None,
+        speed_limits=limits,
+    )
 
 
 @router.get("/sessions/{session_id}/telemetry", response_model=List[TelemetrySeriesPoint])
@@ -107,6 +141,11 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int, token: str =
             payload = message.get("payload", {})
             if event == "telemetry.update":
                 telemetry = TelemetrySchema(**payload)
+                # Pull the road data for wherever they are into the cache now,
+                # in the background. The drive has minutes left; the end-of-drive
+                # rollup then reads limits locally instead of waiting on — and
+                # gambling on — a public map server at that exact moment.
+                warm_tile(telemetry.latitude, telemetry.longitude)
                 with new_session() as db:
                     participant = db.exec(
                         select(SessionParticipant).where(
@@ -119,6 +158,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int, token: str =
                             TelemetryPoint(
                                 session_id=session_id,
                                 participant_id=participant.id,
+                                timestamp=_fix_time(telemetry.recorded_at),
                                 latitude=telemetry.latitude,
                                 longitude=telemetry.longitude,
                                 speed_kmh=telemetry.speed_kmh,

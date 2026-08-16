@@ -85,7 +85,33 @@ the database to Postgres (see `docs/ANALYTICS_ARCHITECTURE.md`).
 
 - Move WebSocket rooms to Redis pub/sub so the API can run more than one
   instance (the current room manager is in-memory, so it can't)
-- Map-match real road speed limits — the Safety score currently penalises
-  against a flat 120 km/h placeholder (`analytics.DEFAULT_SPEED_LIMIT_KMH`),
-  which never triggers in town
 - Upgrade off SQLModel 0.0.8, which pins the app to Pydantic v1
+- Self-host an Overpass instance (or switch to a paid provider) if speed-limit
+  coverage matters at scale — see "Speed limits" below
+
+## Speed limits
+
+The Safety score judges speeding against real road limits from OpenStreetMap
+(`app/speed_limits.py`), not the flat 120 km/h placeholder it used to use — that
+placeholder meant a drive through a 30 km/h street never registered as speeding
+at all.
+
+How it works:
+
+- **Tiles, cached.** Roads are fetched per ~3 km tile from Overpass and cached
+  in the `roadtile` table for 30 days. Repeat drives down the same roads cost
+  nothing, and everyone in a race after the first is a pure cache hit.
+- **Warmed during the drive.** Each telemetry sample queues a background fetch
+  for its tile (`warm_tile`). By the time the drive ends, scoring reads locally.
+  This matters more than it sounds: the public Overpass servers were measured
+  answering one identical query in 1.6s and, twenty minutes later, 35s.
+- **Untagged roads fall back to their `highway=` class.** Only ~5% of ways in
+  Hyderabad carry a `maxspeed` tag, so most limits come from the class table.
+- **It declines rather than guesses.** If under 60% of a drive's points land on
+  a known road, the whole lookup returns nothing and the drive is scored with no
+  speeding penalty at all. A missing penalty is a much smaller error than one
+  invented from a road the driver was never on.
+- **It never blocks a drive.** Overpass being slow, throttling, or down costs a
+  bounded wait once, then a 5-minute backoff.
+
+`analytics.py` stays pure — it receives limits as a plain list and does no I/O.

@@ -12,6 +12,7 @@ from fastapi import HTTPException
 from sqlmodel import Session, select
 
 from app.analytics import analyze_drive
+from app.speed_limits import limits_for_telemetry
 from app.models import (
     Session as SprintSession,
     SessionParticipant,
@@ -44,10 +45,15 @@ def generate_room_code(db: Session) -> str:
     raise HTTPException(status_code=500, detail="Unable to generate unique room code")
 
 
-def finalize_session_stats(session_id: int, db: Session) -> None:
+def finalize_session_stats(session_id: int, db: Session, fetch_limits: bool = True) -> None:
     """Roll the raw telemetry stream up into per-participant results, assign
     final ranks (furthest distance wins), and fold the totals into each user's
-    lifetime profile stats."""
+    lifetime profile stats.
+
+    `fetch_limits=False` scores against whatever road data is already cached
+    instead of going to the network — for bulk work like seeding, where a map
+    lookup per drive would dominate the runtime and hammer a public server.
+    """
     sprint_session = db.get(SprintSession, session_id)
     is_solo = bool(sprint_session.is_solo) if sprint_session else False
     participants = db.exec(
@@ -66,7 +72,16 @@ def finalize_session_stats(session_id: int, db: Session) -> None:
         participant.average_speed_kmh = int(sum(speeds) / len(speeds)) if speeds else 0
         # Snapshot the Driving Score so the stats dashboard reads it cheaply.
         vehicle = db.get(Vehicle, participant.vehicle_id)
-        analysis = analyze_drive(points, fuel_type=vehicle.fuel_type if vehicle else None)
+        # Resolve the real speed limit under each point before scoring. This is
+        # the one moment in a drive's life where it's worth waiting on the map
+        # server: the score computed here is the one that gets stored. In a race
+        # everyone drove the same roads, so racer 2 onward is a pure cache hit.
+        limits = limits_for_telemetry(points, db, allow_fetch=fetch_limits)
+        analysis = analyze_drive(
+            points,
+            fuel_type=vehicle.fuel_type if vehicle else None,
+            speed_limits=limits,
+        )
         if analysis.status == "ok":
             participant.overall_score = analysis.score.overall
             participant.safety_score = analysis.score.safety

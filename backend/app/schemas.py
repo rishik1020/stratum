@@ -137,6 +137,12 @@ class TelemetrySchema(BaseModel):
     accuracy_m: Optional[float] = None
     altitude_m: Optional[float] = None
     g_force: Optional[float] = None
+    # When the fix was actually taken on the device, not when it reached us.
+    # Phones lose the socket constantly — screen off, tunnel, cell handover — so
+    # the client buffers and replays. Stamping those on arrival would compress
+    # minutes of driving into one instant, and every derived value (Δt, accel,
+    # duration, every score) would be computed from that lie.
+    recorded_at: Optional[datetime] = None
 
 
 class UserSessionSummary(BaseModel):
@@ -248,6 +254,12 @@ class EventCountsSchema(BaseModel):
     sharp_cornering: int
     speeding_seconds: float
     speeding_ratio: float
+    # How far over the limit, not just how long — see analytics.EventCounts.
+    speeding_severity: float = 0.0
+    max_over_limit_kmh: float = 0.0
+    # False means the flat fallback limit was used, not real road data. The UI
+    # needs this to avoid presenting a guess as a measurement.
+    limits_matched: bool = False
 
 
 class DriveScoreSchema(BaseModel):

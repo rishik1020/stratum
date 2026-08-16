@@ -24,6 +24,15 @@ interface DriveAnalytics {
     rapid_acceleration: number
     sharp_cornering: number
     speeding_ratio: number
+    /** Worst moment, km/h over the limit. Only meaningful when limits_matched. */
+    max_over_limit_kmh?: number
+    /**
+     * Whether real road limits were map-matched for this drive. False means the
+     * lenient flat fallback was used — usually a cold road-tile cache. The UI
+     * must not report a speeding figure derived from that as if it were
+     * measured against actual roads.
+     */
+    limits_matched?: boolean
   }
   score: { overall: number; safety: number; eco: number; performance: number; comfort: number }
   insights: {
@@ -140,9 +149,26 @@ export const DriveScorePanel = ({ sessionId }: { sessionId: number }) => {
         {events.harsh_braking > 0 && <Chip text={`${events.harsh_braking} harsh braking`} tone="bad" />}
         {events.rapid_acceleration > 0 && <Chip text={`${events.rapid_acceleration} hard accel`} tone="bad" />}
         {events.sharp_cornering > 0 && <Chip text={`${events.sharp_cornering} sharp corners`} tone="bad" />}
-        {events.speeding_ratio > 0.05 && <Chip text={`${Math.round(events.speeding_ratio * 100)}% over limit`} tone="bad" />}
+        {events.speeding_ratio > 0.05 && (
+          <Chip
+            text={
+              events.max_over_limit_kmh
+                ? `${Math.round(events.speeding_ratio * 100)}% over limit · peak +${Math.round(events.max_over_limit_kmh)}`
+                : `${Math.round(events.speeding_ratio * 100)}% over limit`
+            }
+            tone="bad"
+          />
+        )}
         {insights.smooth_pct >= 70 && <Chip text={`${insights.smooth_pct}% smooth`} tone="good" />}
       </div>
+
+      {/* Say so when the Safety score couldn't be checked against real roads,
+          rather than letting a clean-looking number imply it was. */}
+      {events.limits_matched === false && (
+        <p className="mt-2 text-[11px] text-white/40">
+          Road speed limits weren’t available for this drive, so speeding wasn’t assessed.
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-4 mt-5">
         <div>
