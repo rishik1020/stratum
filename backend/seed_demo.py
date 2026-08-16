@@ -164,7 +164,10 @@ def seed(email: str, count: int) -> None:
             db.commit()
 
             # Let the real engine score it — no hand-written numbers.
-            finalize_session_stats(drive.id, db)
+            # Cached road data only: a map lookup per seeded drive would
+            # dominate the runtime and lean on a free public server for
+            # data nobody is going to look at.
+            finalize_session_stats(drive.id, db, fetch_limits=False)
             made += 1
             print(f"  {drive.name.replace(chr(0xB7), '-'):28s} {len(points):4d} points  {cum/1000:5.1f} km")
 
@@ -253,6 +256,7 @@ def seed_race(email: str) -> None:
         # Pace multiplier per car — the spread is what makes the gaps interesting.
         paces = [1.0, 0.94, 1.07, 0.88]
 
+        last_fix = None
         for idx, racer in enumerate(racers):
             vehicle = db.exec(select(Vehicle).where(Vehicle.user_id == racer.id)).first()
             participant = SessionParticipant(
@@ -267,27 +271,57 @@ def seed_race(email: str) -> None:
             pace = paces[idx % len(paces)]
             # Lane offset keeps the four trails distinguishable on the map.
             lane = (idx - 1.5) * 0.00018
-            samples = int(420 * pace)
-            path = _interpolate_route(ROUTE_A_TO_B, samples, 0.00006, rng)
+            # Spatial resolution only. How long the drive takes falls out of the
+            # speed profile below, so a slower pace finishes later rather than
+            # covering the same ground in the same time.
+            # Jitter has to stay small next to the ~16 m spacing between
+            # samples. It used to be ±6.7 m, which was harmless while every
+            # sample was one second apart — but now that elapsed time comes from
+            # distance, two jittered points landing 0.25 m apart become a 0.02 s
+            # gap, MIN_DT clamps it, and the engine sees 4 g of acceleration
+            # that never happened. That artefact alone was scoring an ordinary
+            # city drive at comfort 0.
+            path = _interpolate_route(ROUTE_A_TO_B, 1300, 0.00001, rng)
 
             t = started
             cumulative = 0.0
             prev = None
+            speed = 18.0  # rolling start; the profile eases up from here
             for i, (plat, plng) in enumerate(path):
                 plat += lane
                 plng += lane
+
+                # Slow for the two mid-route junctions, quick on the open
+                # stretches. The floor matters more than it looks: now that
+                # elapsed time is derived from speed, the slowest stretches
+                # dominate a distance-over-time average, and a profile dipping
+                # to walking pace dragged the whole drive down to 19 km/h.
+                #
+                # Ease toward the target rather than sampling it independently
+                # each point, exactly as the solo traces do. Independent noise
+                # of ±4 km/h between samples ~1 s apart *is* ±3 m/s² — it was
+                # manufacturing 89 harsh brakes and 140 hard accelerations out
+                # of nothing, and scoring a steady cruise at comfort 0. Real
+                # speed is continuous; the noise has to be too.
+                phase = i / max(1, len(path))
+                target = (46 + 26 * math.sin(phase * math.pi * 3)) / pace
+                speed += (target - speed) * 0.06 + rng.gauss(0, 0.35)
+                speed = max(15.0, speed)
+
                 step = 0.0
                 if prev:
                     dlat = (plat - prev[0]) * 111_320
                     dlng = (plng - prev[1]) * 111_320 * math.cos(math.radians(plat))
                     step = math.hypot(dlat, dlng)
+                    # Advance the clock by how long this step *actually takes*
+                    # at this speed. Positions used to march one point per
+                    # second along a fixed 16 km route while the speeds were
+                    # invented separately, so the data claimed 16 km in 7
+                    # minutes — an average of 139 km/h against a reported top
+                    # speed of 82. Every metric derived from it was nonsense.
+                    t += timedelta(seconds=step / (speed / 3.6))
                 prev = (plat, plng)
                 cumulative += step
-
-                # Slow for the two mid-route junctions, quick on the open stretches.
-                phase = i / max(1, len(path))
-                base = 38 + 34 * math.sin(phase * math.pi * 3)
-                speed = max(0.0, (base + rng.gauss(0, 4)) / pace)
 
                 db.add(
                     TelemetryPoint(
@@ -305,17 +339,27 @@ def seed_race(email: str) -> None:
                         g_force=abs(rng.gauss(0.1, 0.07)),
                     )
                 )
-                t += timedelta(seconds=1)
             db.commit()
-            print(f"  {racer.display_name:16s} {len(path):4d} points  {cumulative/1000:5.1f} km")
+            last_fix = max(last_fix, t) if last_fix else t
+            mins = (t - started).total_seconds() / 60
+            print(
+                f"  {racer.display_name:16s} {len(path):4d} points  "
+                f"{cumulative/1000:5.1f} km  {mins:4.1f} min  "
+                f"avg {cumulative / (t - started).total_seconds() * 3.6:5.1f} km/h"
+            )
 
         race.status = SessionStatus.ended
-        race.ended_at = started + timedelta(seconds=460)
+        # The finish is whenever the last car actually got there — derived from
+        # the trace, not a guessed constant. A slower pace now genuinely takes
+        # longer, so a fixed 460 s would have contradicted the telemetry.
+        race.ended_at = last_fix
         db.add(race)
         db.commit()
-        finalize_session_stats(race.id, db)
+        finalize_session_stats(race.id, db, fetch_limits=False)
 
-        print(f"\nSeeded race #{race.id}: {race.name}")
+        # The Windows console is cp1252, which has no arrow or mid-dot.
+        label = race.name.replace(chr(0x2192), "->").replace(chr(0xB7), "-")
+        print(f"\nSeeded race #{race.id}: {label}")
         print(f"  replay it at  /#/sessions/{race.id}/results")
 
 
