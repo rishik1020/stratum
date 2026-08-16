@@ -19,23 +19,26 @@ import { BEATS, ramp, window_ } from "./useCinematic"
 
 const CABIN_IMAGE = "/cabin/driver.jpg"
 
+/** The photo's aspect ratio. The overlay is positioned against this, not the
+ *  viewport — see the cover box in the render. */
+const PHOTO_W = 1920
+const PHOTO_H = 1080
+
 /**
- * Where the infotainment screen sits in that photo, as percentages of the
- * image box, plus the perspective it's seen at.
+ * Where the infotainment screen sits in the photo, measured off driver.jpg:
+ * the lit area runs x 1010→1277, y 427→508 of 1920×1080.
  *
- * Tune these against the real photo — open the film at `#/?t=10.5` and nudge
- * until the overlay sits inside the bezel. They're percentages so they hold as
- * the image scales, and they're here rather than inline precisely because
- * they're the numbers most likely to need adjusting.
+ * Percentages of the photo box, so they hold at any size. Nudge with the film
+ * paused at `#/?t=10.5` if the overlay drifts off the bezel.
  */
 const SCREEN = {
-  left: 52.6,
-  top: 38.5,
-  width: 12.6,
-  height: 8.3,
-  /** The dash angles the display toward the driver. */
-  rotateY: -13,
-  rotateX: 2,
+  left: (1010 / PHOTO_W) * 100,
+  top: (427 / PHOTO_H) * 100,
+  width: ((1277 - 1010) / PHOTO_W) * 100,
+  height: ((508 - 427) / PHOTO_H) * 100,
+  /** The dash cants the display toward the driver. */
+  rotateY: -9,
+  rotateX: 1,
 }
 
 const START_PRESS = BEATS.start
@@ -132,19 +135,48 @@ export function CabinScene({ t }: { t: number }) {
 
   return (
     <motion.div style={{ opacity }} className="absolute inset-0 z-30 overflow-hidden bg-ink">
-      {/* The cabin itself. object-cover keeps the driver's eyeline centred as
-          the viewport changes shape. */}
+      {/* The cabin, and the screen overlay, inside one box that keeps the
+          photo's aspect ratio and covers the viewport (min-w/h-full + a fixed
+          ratio is cover behaviour). Both are positioned against this box, so
+          the overlay stays on the bezel at any window shape — with the image
+          on object-cover and the overlay on the container, they only lined up
+          at exactly 16:9. */}
       {hasPhoto && (
-        <img
-          src={CABIN_IMAGE}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover"
-          style={{
-            // A slow push-in gives the still some life without a second asset.
-            transform: `scale(${1.04 + ramp(t, BEATS.uiIn, BEATS.uiOut) * 0.06})`,
-            transformOrigin: "58% 45%",
-          }}
-        />
+        <div className="absolute inset-0 overflow-hidden">
+          <div
+            className="absolute left-1/2 top-1/2 aspect-[16/9] min-h-full min-w-full -translate-x-1/2 -translate-y-1/2"
+            style={{
+              // A slow push-in gives the still some life without a second asset.
+              transform: `translate(-50%, -50%) scale(${1.03 + ramp(t, BEATS.uiIn, BEATS.uiOut) * 0.05})`,
+              transformOrigin: "58% 45%",
+            }}
+          >
+            <img src={CABIN_IMAGE} alt="" className="h-full w-full" />
+
+            <div className="absolute inset-0" style={{ perspective: "900px" }}>
+              <div
+                className="absolute overflow-hidden"
+                style={{
+                  left: `${SCREEN.left}%`,
+                  top: `${SCREEN.top}%`,
+                  width: `${SCREEN.width}%`,
+                  height: `${SCREEN.height}%`,
+                  transform: `rotateY(${SCREEN.rotateY}deg) rotateX(${SCREEN.rotateX}deg)`,
+                  transformStyle: "preserve-3d",
+                  boxShadow: "0 0 26px rgba(255,176,32,0.28)",
+                }}
+              >
+                <CarDashboard
+                  state={dash}
+                  sessionName="Hyderabad run"
+                  map={<FilmMap p={p} />}
+                  primaryLabel={started ? "End drive" : "Start drive"}
+                  interactive={false}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Graded down so the bright daylight photo sits in the film's night
@@ -170,32 +202,6 @@ export function CabinScene({ t }: { t: number }) {
           WebkitMaskImage: "radial-gradient(60% 100% at 50% 100%, black, transparent 72%)",
         }}
       />
-
-      {/* --- The app, on the car's screen -------------------------------- */}
-      {hasPhoto && (
-      <div className="absolute inset-0" style={{ perspective: "900px" }}>
-        <div
-          className="absolute overflow-hidden rounded-[3px]"
-          style={{
-            left: `${SCREEN.left}%`,
-            top: `${SCREEN.top}%`,
-            width: `${SCREEN.width}%`,
-            height: `${SCREEN.height}%`,
-            transform: `rotateY(${SCREEN.rotateY}deg) rotateX(${SCREEN.rotateX}deg)`,
-            transformStyle: "preserve-3d",
-            boxShadow: "0 0 22px rgba(255,176,32,0.22)",
-          }}
-        >
-          <CarDashboard
-            state={dash}
-            sessionName="Hyderabad run"
-            map={<FilmMap p={p} />}
-            primaryLabel={started ? "End drive" : "Start drive"}
-            interactive={false}
-          />
-        </div>
-      </div>
-      )}
 
       {/* Without the photo the beat still plays, just plainly. */}
       {!hasPhoto && (
