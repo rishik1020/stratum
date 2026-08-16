@@ -1,22 +1,18 @@
-import { Suspense, lazy, useEffect, useRef, useState } from "react"
-import { motion, MotionConfig, useScroll, useTransform } from "framer-motion"
+import { Suspense, lazy, useState } from "react"
+import { motion, MotionConfig } from "framer-motion"
 import { useNavigate } from "react-router-dom"
-import { Smartphone, Radio, Gauge, ArrowDown, Menu, X } from "lucide-react"
+import { ArrowDown, Menu, RotateCcw, X } from "lucide-react"
 
+import { InCarUI } from "./InCarUI"
+import { BEATS, useCinematic, window_, ramp } from "./useCinematic"
 import { routes } from "../routes"
 
 // three.js is heavy even inside the already-lazy landing chunk, so the canvas
 // is split again and only fetched once this page actually mounts.
 const CarStage = lazy(() => import("./CarStage").then((m) => ({ default: m.CarStage })))
 
-/** Scroll height given to the car sequence, in viewports. */
-const STAGE_VH = 4
-
-const TRACK_MODES = [
-  { icon: Smartphone, title: "Your phone", body: "Mount it and go. GPS and motion sensors do the rest." },
-  { icon: Radio, title: "Android Auto", body: "Cast the live map and gap tower to the head unit." },
-  { icon: Gauge, title: "CarPlay", body: "Speed, score and position, on the dash where you're already looking." },
-]
+/** Total run time of the opening film, in seconds. */
+const RUNTIME = BEATS.runtime
 
 const STEPS = [
   { n: "01", title: "Add your car", body: "Pick it from the catalogue — specs autofill, and stay editable if yours is modified." },
@@ -24,57 +20,32 @@ const STEPS = [
   { n: "03", title: "Read the data", body: "Score, coach notes and a scrubbable replay of the whole drive, waiting when you stop." },
 ]
 
-/** One beat of copy pinned over the car while the camera moves. */
-function Beat({
-  progress,
-  from,
-  to,
-  children,
-}: {
-  progress: ReturnType<typeof useScroll>["scrollYProgress"]
-  from: number
-  to: number
-  children: React.ReactNode
-}) {
-  const span = to - from
-  const opacity = useTransform(
-    progress,
-    [from, from + span * 0.22, to - span * 0.22, to],
-    [0, 1, 1, 0]
-  )
-  const y = useTransform(progress, [from, to], [24, -24])
-  return (
-    <motion.div
-      style={{ opacity, y }}
-      className="pointer-events-none absolute inset-x-0 top-1/2 z-20 -translate-y-1/2 px-6"
-    >
-      <div className="pointer-events-auto mx-auto max-w-3xl text-center">{children}</div>
-    </motion.div>
-  )
-}
-
+/**
+ * The landing page plays a film.
+ *
+ * It opens on the 911 in flat side profile, drifts forward, pushes in toward
+ * the driver's glass while the in-car UI takes over and a drive is started,
+ * then pulls out to a rear three-quarter as the car launches away. No scroll
+ * required — the whole pitch lands before the visitor does anything.
+ *
+ * Everything on screen is keyed off one clock (useCinematic), so the 3D camera
+ * and the DOM overlays are stepped from the same frame and can't drift apart.
+ */
 export function LandingPage() {
   const navigate = useNavigate()
   const enter = () => navigate(routes.signin)
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const stageRef = useRef<HTMLDivElement>(null)
-  const { scrollYProgress } = useScroll({ target: stageRef, offset: ["start start", "end end"] })
+  const { t, tRef, done, skip, replay, progress } = useCinematic(RUNTIME)
 
-  // The canvas reads scroll from a ref rather than React state — it repaints
-  // every frame anyway, and re-rendering the tree on each scroll event would
-  // fight the render loop.
-  const progressRef = useRef(0)
-  useEffect(() => scrollYProgress.on("change", (v) => (progressRef.current = v)), [scrollYProgress])
-
-  // Fade the canvas out once the car sequence is done and the written sections
-  // take over.
-  const stageOpacity = useTransform(scrollYProgress, [0, 0.88, 1], [1, 1, 0])
+  // Act 1 copy rides the opening side profile, then clears for the cabin beat.
+  const heroOpacity = window_(t, BEATS.heroIn, BEATS.heroOut, 0.9)
+  // Closing card arrives with the car pulling away.
+  const outroOpacity = ramp(t, BEATS.outroIn, BEATS.outroFull)
 
   return (
     <MotionConfig reducedMotion="user">
       <div className="relative bg-ink text-white">
-        {/* --- Top bar (fixed over everything) --------------------------- */}
         <header className="fixed inset-x-0 top-0 z-50 flex items-center justify-between px-6 pt-safe md:px-10">
           <span className="display py-5 text-sm tracking-tight text-white/90">STRATUM</span>
           <div className="flex items-center gap-2">
@@ -94,93 +65,102 @@ export function LandingPage() {
           </div>
         </header>
 
-        {/* --- The car sequence -------------------------------------------
-            A tall scroll track with a sticky viewport inside it: the canvas
-            stays put while the page scrolls, which is what turns scroll
-            distance into camera movement. */}
-        <div ref={stageRef} style={{ height: `${STAGE_VH * 100}vh` }} className="relative">
-          <div className="sticky top-0 h-[100dvh] overflow-hidden">
-            <motion.div style={{ opacity: stageOpacity }} className="absolute inset-0">
-              <Suspense fallback={null}>
-                <CarStage progress={progressRef} />
-              </Suspense>
-            </motion.div>
+        {/* --- The film ---------------------------------------------------- */}
+        <section className="relative h-[100dvh] overflow-hidden">
+          <div className="absolute inset-0">
+            <Suspense fallback={null}>
+              <CarStage time={tRef} />
+            </Suspense>
+          </div>
 
-            {/* Vignette, so type always has something to sit on. */}
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 z-10"
-              style={{
-                background:
-                  "radial-gradient(80% 60% at 50% 45%, transparent 30%, rgba(8,8,10,0.72) 100%)",
-              }}
-            />
+          {/* Vignette so type always has something to sit on. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 z-10"
+            style={{
+              background: "radial-gradient(85% 65% at 50% 45%, transparent 25%, rgba(8,8,10,0.78) 100%)",
+            }}
+          />
 
-            {/* Beat 1 — exterior */}
-            <Beat progress={scrollYProgress} from={0} to={0.3}>
-              <p className="text-[10px] font-medium uppercase tracking-[0.4em] text-white/45">
-                Strava for cars
-              </p>
-              <h1 className="display mt-5 text-[11vw] leading-[0.92] text-white sm:text-6xl md:text-7xl">
-                RACE ANYONE.
-                <br />
-                SCORE EVERY DRIVE.
-              </h1>
-              <button
-                onClick={enter}
-                className="mt-8 rounded-pill border border-white/25 px-8 py-3 text-[11px] font-medium uppercase tracking-[0.25em] text-white/85 transition-colors hover:border-amber hover:text-amber"
-              >
-                Get started
-              </button>
-            </Beat>
+          {/* Act 1 — side profile */}
+          <div
+            style={{ opacity: heroOpacity }}
+            className="pointer-events-none absolute inset-x-0 top-[16vh] z-20 px-6 text-center"
+          >
+            <p className="text-[10px] font-medium uppercase tracking-[0.4em] text-white/45">
+              Strava for cars
+            </p>
+            <h1 className="display mt-5 text-[11vw] leading-[0.92] text-white sm:text-6xl md:text-7xl">
+              RACE ANYONE.
+              <br />
+              SCORE EVERY DRIVE.
+            </h1>
+          </div>
 
-            {/* Beat 2 — the car you already own */}
-            <Beat progress={scrollYProgress} from={0.32} to={0.62}>
-              <p className="text-[10px] font-medium uppercase tracking-[0.4em] text-amber">No hardware</p>
-              <h2 className="display mt-4 text-4xl leading-tight md:text-5xl">
-                Nothing to fit.
-                <br />
-                Nothing to wire.
-              </h2>
-              <p className="mx-auto mt-5 max-w-md text-sm leading-relaxed text-white/55">
-                No box under the dash, no OBD dongle. The car you already own, and the phone already in your pocket.
-              </p>
-            </Beat>
+          {/* Act 2 — in the car */}
+          <InCarUI t={t} />
 
-            {/* Beat 3 — inside, tracking modes */}
-            <Beat progress={scrollYProgress} from={0.64} to={1}>
-              <p className="text-[10px] font-medium uppercase tracking-[0.4em] text-amber">In the car</p>
-              <h2 className="display mt-4 text-4xl leading-tight md:text-5xl">Track it your way.</h2>
-              <div className="mt-8 grid gap-3 sm:grid-cols-3">
-                {TRACK_MODES.map((m) => (
-                  <div
-                    key={m.title}
-                    className="rounded-card border border-hairline bg-ink-1/85 p-5 text-left backdrop-blur-sm"
-                  >
-                    <m.icon size={20} className="text-amber" />
-                    <h3 className="display mt-3 text-base">{m.title}</h3>
-                    <p className="mt-1.5 text-xs leading-relaxed text-white/50">{m.body}</p>
-                  </div>
-                ))}
-              </div>
-            </Beat>
-
-            {/* Scroll hint, first screen only */}
-            <motion.div
-              style={{ opacity: useTransform(scrollYProgress, [0, 0.06], [1, 0]) }}
-              className="pointer-events-none absolute bottom-8 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-1 text-white/35"
+          {/* Act 3 — it's gone */}
+          <div
+            style={{ opacity: outroOpacity }}
+            className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center px-6 text-center"
+          >
+            <h2 className="display text-4xl leading-tight md:text-6xl">Then you just drive.</h2>
+            <p className="mt-4 max-w-md text-sm leading-relaxed text-white/55">
+              Score, coach notes and a full replay are waiting when you stop.
+            </p>
+            <button
+              onClick={enter}
+              className="pointer-events-auto mt-8 rounded-pill bg-amber px-8 py-3.5 text-[11px] font-semibold uppercase tracking-[0.25em] text-amber-ink transition-colors hover:bg-amber-soft"
             >
-              <span className="text-[10px] uppercase tracking-[0.2em]">Scroll</span>
+              Get started
+            </button>
+          </div>
+
+          {/* Transport: skip while it plays, replay once it's over. */}
+          <div className="absolute inset-x-0 bottom-0 z-40 flex items-end justify-between px-6 pb-6 md:px-10">
+            <span className="text-[10px] uppercase tracking-[0.25em] text-white/25">Telemetry</span>
+
+            {!done ? (
+              <button
+                onClick={skip}
+                className="flex items-center gap-3 text-[10px] uppercase tracking-[0.25em] text-white/40 transition-colors hover:text-white"
+              >
+                Skip
+                <span className="relative h-px w-16 bg-white/15">
+                  <span
+                    className="absolute inset-y-0 left-0 bg-amber"
+                    style={{ width: `${progress * 100}%` }}
+                  />
+                </span>
+              </button>
+            ) : (
+              <button
+                onClick={replay}
+                className="flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] text-white/40 transition-colors hover:text-white"
+              >
+                <RotateCcw size={12} />
+                Replay
+              </button>
+            )}
+          </div>
+
+          {/* Only invite scrolling once the film has said its piece. */}
+          {done && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1, y: [0, 8, 0] }}
+              transition={{
+                opacity: { duration: 0.6 },
+                y: { duration: 1.8, repeat: Infinity, ease: "easeInOut" },
+              }}
+              className="pointer-events-none absolute bottom-16 left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-1 text-white/35"
+            >
+              <span className="text-[10px] uppercase tracking-[0.2em]">How it works</span>
               <ArrowDown size={16} />
             </motion.div>
-
-            {/* Corner meta */}
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-center justify-between px-6 pb-5 text-[10px] uppercase tracking-[0.25em] text-white/25 md:px-10">
-              <span>Telemetry</span>
-              <span>{new Date().getFullYear()}</span>
-            </div>
-          </div>
-        </div>
+          )}
+        </section>
 
         {/* --- How it works ------------------------------------------------ */}
         <section className="relative z-10 mx-auto max-w-6xl px-6 py-24 md:px-10 md:py-32">
@@ -228,7 +208,6 @@ export function LandingPage() {
           </div>
         </footer>
 
-        {/* --- Mobile menu -------------------------------------------------- */}
         {menuOpen && (
           <motion.div
             initial={{ opacity: 0 }}
