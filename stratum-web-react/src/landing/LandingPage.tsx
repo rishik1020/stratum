@@ -3,7 +3,7 @@ import { motion, MotionConfig } from "framer-motion"
 import { useNavigate } from "react-router-dom"
 import { ArrowDown, Menu, RotateCcw, X } from "lucide-react"
 
-import { InCarUI } from "./InCarUI"
+import { CabinScene } from "./CabinScene"
 import { BEATS, useCinematic, window_, ramp } from "./useCinematic"
 import { routes } from "../routes"
 
@@ -97,8 +97,8 @@ export function LandingPage() {
             </h1>
           </div>
 
-          {/* Act 2 — in the car */}
-          <InCarUI t={t} />
+          {/* Act 2 — in the car, on the car's own screen */}
+          <CabinScene t={t} />
 
           {/* Act 3 — it's gone */}
           <div
