@@ -54,3 +54,8 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# ── Landing-page 3D model ─────────────────────────────────────────────────
+# The car is a large binary that changes rarely and isn't source. Keep it out
+# of history; see docs/CAR_MODEL.md for how to regenerate it.
+stratum-web-react/public/car.glb

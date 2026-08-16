@@ -134,22 +134,22 @@ export function LandingPage() {
               </button>
             </Beat>
 
-            {/* Beat 2 — approaching the cabin */}
+            {/* Beat 2 — the car you already own */}
             <Beat progress={scrollYProgress} from={0.32} to={0.62}>
-              <p className="text-[10px] font-medium uppercase tracking-[0.4em] text-amber">Step inside</p>
+              <p className="text-[10px] font-medium uppercase tracking-[0.4em] text-amber">No hardware</p>
               <h2 className="display mt-4 text-4xl leading-tight md:text-5xl">
-                Everything happens
+                Nothing to fit.
                 <br />
-                from the driver's seat.
+                Nothing to wire.
               </h2>
               <p className="mx-auto mt-5 max-w-md text-sm leading-relaxed text-white/55">
-                No box to install, no wiring. The car you already own, and the phone already in your pocket.
+                No box under the dash, no OBD dongle. The car you already own, and the phone already in your pocket.
               </p>
             </Beat>
 
             {/* Beat 3 — inside, tracking modes */}
             <Beat progress={scrollYProgress} from={0.64} to={1}>
-              <p className="text-[10px] font-medium uppercase tracking-[0.4em] text-amber">On the dash</p>
+              <p className="text-[10px] font-medium uppercase tracking-[0.4em] text-amber">In the car</p>
               <h2 className="display mt-4 text-4xl leading-tight md:text-5xl">Track it your way.</h2>
               <div className="mt-8 grid gap-3 sm:grid-cols-3">
                 {TRACK_MODES.map((m) => (

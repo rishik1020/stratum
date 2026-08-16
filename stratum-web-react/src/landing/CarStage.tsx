@@ -6,24 +6,31 @@ import * as THREE from "three"
 /** Where to drop the model. See docs/CAR_MODEL.md. */
 export const CAR_MODEL_URL = "/car.glb"
 
+/** Locally vendored so the APK decodes Draco offline, not off a CDN. */
+const DRACO_PATH = "/draco/"
+
 /**
  * Camera keyframes for the scroll story, in scroll-progress order.
  *
  * `pos` is where the camera sits, `look` is what it aims at. Progress between
- * two keyframes is eased and interpolated, so the whole sequence — orbit the
- * car, move to the driver's door, settle in the cabin — is one continuous move
- * rather than a set of cuts.
+ * two keyframes is eased and interpolated, so the sequence is one continuous
+ * move rather than a set of cuts.
  *
- * Values assume a car roughly 4.5 m long facing +Z, sitting on y=0. A model
- * with different proportions is handled by the auto-fit in <FitToModel>, which
- * scales the whole car to a known size before these run.
+ * Exterior only, deliberately. The shipped Porsche model is a body shell with
+ * no cabin — no seats, dash or wheel — so a camera that flew inside would land
+ * in an empty box. Instead it circles, drops low along the flank and comes
+ * round to a headlight-on close-up. Swap in a model with an interior and the
+ * last two shots can move inside; see docs/CAR_MODEL.md.
+ *
+ * Values assume a car ~4.5 m long facing +Z on y=0. <FitToModel> normalises
+ * any model to that before these run.
  */
 const SHOTS = [
-  { at: 0.0, pos: [5.2, 1.9, 6.4], look: [0, 0.7, 0] }, // wide three-quarter
-  { at: 0.3, pos: [-5.6, 1.4, 3.2], look: [0, 0.7, 0] }, // orbit round the front
-  { at: 0.55, pos: [-1.9, 1.35, 0.6], look: [-0.3, 1.05, 0.1] }, // at the driver's door
-  { at: 0.75, pos: [-0.35, 1.15, -0.15], look: [0.1, 1.0, 1.6] }, // inside, facing forward
-  { at: 1.0, pos: [-0.35, 1.12, -0.1], look: [0.35, 0.95, 1.4] }, // settled on the dash
+  { at: 0.0, pos: [5.4, 2.0, 6.6], look: [0, 0.65, 0] }, // wide three-quarter
+  { at: 0.28, pos: [-6.2, 1.5, 3.4], look: [0, 0.65, 0] }, // swing round the nose
+  { at: 0.52, pos: [-4.4, 0.75, -3.6], look: [0, 0.6, 0] }, // low, rear three-quarter
+  { at: 0.78, pos: [-1.5, 0.6, -4.6], look: [0, 0.7, 0.4] }, // hugging the flank
+  { at: 1.0, pos: [0.5, 0.85, 6.2], look: [0, 0.6, 0] }, // head-on, lights up
 ]
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2)
@@ -63,12 +70,33 @@ function CameraRig({ progress }: { progress: React.MutableRefObject<number> }) {
  * without hand-tuning per model.
  */
 function FitToModel({ url, targetLength = 4.5 }: { url: string; targetLength?: number }) {
-  const { scene } = useGLTF(url)
+  const { scene } = useGLTF(url, DRACO_PATH)
   const ref = useRef<THREE.Group>(null)
 
   useEffect(() => {
     const group = ref.current
     if (!group) return
+
+    // Sketchfab exports carry the original Blender scene: a ground plane and
+    // studio lamps. Both fight the lighting set up here, and the plane throws
+    // off the bounding box the fit is measured from — so drop them first.
+    const planes: THREE.Object3D[] = []
+    scene.traverse((o) => {
+      if ((o as THREE.Light).isLight) planes.push(o)
+      const mesh = o as THREE.Mesh
+      if (!mesh.isMesh || !mesh.geometry) return
+      mesh.geometry.computeBoundingBox()
+      const b = mesh.geometry.boundingBox
+      if (!b) return
+      const s = new THREE.Vector3()
+      b.getSize(s)
+      // Wide and flat = backdrop, not bodywork.
+      const flat = s.y < Math.max(s.x, s.z) * 0.02
+      const broad = Math.max(s.x, s.z) > 6
+      if (flat && broad) planes.push(mesh)
+    })
+    for (const o of planes) o.visible = false
+
     const box = new THREE.Box3().setFromObject(scene)
     const size = new THREE.Vector3()
     const centre = new THREE.Vector3()
@@ -83,7 +111,7 @@ function FitToModel({ url, targetLength = 4.5 }: { url: string; targetLength?: n
 
     scene.traverse((o) => {
       const mesh = o as THREE.Mesh
-      if (mesh.isMesh) {
+      if (mesh.isMesh && mesh.visible) {
         mesh.castShadow = true
         mesh.receiveShadow = true
       }
