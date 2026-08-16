@@ -1,8 +1,7 @@
 # Stratum — session handoff
 
-Written 2026-08-16. Everything below reflects the repo at commit `55d1941`.
-Working tree is clean; all 25 commits are local (remote is
-`rishik1020/stratum`, private, pushed through `9354295`).
+Written 2026-08-16, updated 2026-08-17 (§2b, §5). Remote is
+`rishik1020/stratum`, private.
 
 ---
 
@@ -20,8 +19,8 @@ npm run dev
 
 **Test account** — `driver@stratum.app` / `stratum1234`
 
-Seeded with 8 solo drives plus a 4-car race (Hitec City → Charminar, ~16 km,
-1620 telemetry points). Regenerate with:
+Seeded with 8 solo drives plus a 4-car race (Hitec City → Charminar, 15.7 km,
+5200 telemetry points, ~21 min per car at 38–47 km/h). Regenerate with:
 
 ```bash
 cd backend
@@ -35,13 +34,13 @@ python seed_demo.py --reset --race
 | `#/` | Landing film (sign out first — signed-in users get redirected) |
 | `#/?t=10.5` | Landing paused at 10.5s, on the in-car beat. **Only works if the hash is present at page load.** |
 | `#/dashboard` | Hub |
-| `#/sessions/31/results` | The seeded 4-car race replay |
+| `#/sessions/<id>/results` | The seeded race replay — `seed_demo.py` prints the id |
 | `#/sessions/:id/car` | Car mode |
 
 ### Checks
 
 ```bash
-cd backend && python run_tests.py        # 23 tests, 3 files
+cd backend && python run_tests.py        # 6 files
 cd stratum-web-react && npx tsc --noEmit && npm run lint
 ```
 
@@ -114,6 +113,111 @@ and rendered.
 > platform permits a racing/telemetry app — third-party categories are
 > navigation, audio, messaging, EV charging and parking — and neither exposes
 > vehicle data. Labelling it CarPlay is a promise that cannot ship.
+
+---
+
+## 2b. Session 2 — scoring, and recording with the screen off
+
+### Real speed limits (`app/speed_limits.py`, migration `0003`)
+
+Safety used to measure speeding against a flat 120 km/h placeholder, so a drive
+through a 30 km/h street never registered as speeding — the largest single term
+in the score was dead in exactly the conditions people actually drive in.
+
+Limits now come from OpenStreetMap per ~3 km tile, cached 30 days in `roadtile`,
+snapped to each telemetry point with a grid index (0.6 ms/point measured — ~1 s
+for a full 16 km drive). `analytics.py` stays pure: it receives a plain list of
+per-point limits and does no I/O.
+
+**Everything hard here was found by running it against the live service, not by
+reasoning about it.** Overpass is volunteer-run and genuinely unreliable — the
+same query took 1.6 s and, twenty minutes later, 35 s, and returned 504s and
+429s in between. What that forced:
+
+- **2 parallel fetches, not 4.** Four got three 429s and one success; Overpass
+  allots ~2 slots per IP. Concurrency was *causing* the failures.
+- **Warm the cache during the drive** (`warm_tile`, called per telemetry
+  sample). This is the load-bearing one — the background path has nobody
+  waiting so it can afford a 60 s timeout, while end-of-drive gets 15 s. Under
+  real conditions, warming is what actually populates the cache.
+- **A coverage floor.** With 1 of 10 tiles resolved, unbounded gap-filling
+  smeared one 20 km/h service road across 319 of 320 points — a normal
+  main-road drive would have scored as 200% over the limit for its whole
+  length. Now: fill only within 250 m of a matched point, and if under 60% of
+  points land on a known road, return nothing and score with no speeding
+  penalty at all. **A missing penalty is a far smaller error than a fabricated
+  one.**
+- **Backoff on failure.** An outage cost the full 15 s budget on *every* call —
+  the second identical call spent another 15 s failing at the same tiles.
+- **Endpoint failover** across three mirrors.
+
+Also in the score: speeding is now judged past a tolerance of max(5 km/h, 7%),
+because GPS error and speedometer bias otherwise flag every drive ever taken;
+and it is weighted by *how far* over, not just how long — 1 km/h over used to
+cost exactly what 50 km/h over did.
+
+`events.limits_matched` says whether real road data was used. The UI reads it
+and says "speeding wasn't assessed" rather than presenting a fallback as a
+measurement.
+
+### Recording with the screen off (`lib/tracking.ts`)
+
+`watchPosition` runs in the WebView, which both OSes suspend when the screen
+locks — so a drive with the phone in a pocket recorded its first minute or two.
+Now `@capacitor-community/background-geolocation` runs an Android foreground
+service; web falls back to `watchPosition` plus a Screen Wake Lock, and says so
+in the UI, because a browser tab genuinely cannot track in the background.
+
+Two things the plugin's README makes clear and are easy to miss:
+
+- `android.useLegacyBridge: true` is **required** in `capacitor.config.ts`, or
+  updates stop after 5 minutes backgrounded — the exact bug being fixed.
+- Android throttles WebView-initiated network after ~5 minutes backgrounded. So
+  on a long drive the socket stalls *even on perfect signal* while the native
+  service keeps producing fixes.
+
+Which is why the socket work matters as much as the plugin:
+
+- **`useSessionSocket` had no reconnection at all**, and `send` silently dropped
+  anything arriving while closed. A drive that lost its socket stopped recording
+  permanently and never said so. Now: exponential backoff with jitter, immediate
+  retry on `online`/visibility, and telemetry queued (bounded, 3000 frames) and
+  replayed in order.
+- **Replayed fixes carry `recorded_at`.** The server stamped rows on arrival, so
+  a flushed backlog would have collapsed minutes of driving into one instant —
+  Δt ≈ 0, which the scoring engine skips outright. Device time is trusted only
+  within +5 min / −6 h of server time.
+
+Do NOT add `ACCESS_BACKGROUND_LOCATION`: with a `location`-type foreground
+service, "while in use" is sufficient, and it would add a harder prompt plus a
+Play Store policy declaration for nothing. Do not redeclare the `<service>`
+either — the plugin's manifest supplies it, and a second entry that disagrees on
+`android:exported` fails the merge.
+
+**Untested on a real device.** Everything above is verified by unit tests, the
+live Overpass probes, and browser checks; the foreground service itself needs an
+APK on a real phone with the screen off.
+
+### Demo data was physically impossible
+
+The race seeder derived position from a fixed 16 km route at one point per
+second (≈138 km/h) while inventing speed from an independent sine wave
+(4–72 km/h). The two were never connected, so the stored data claimed 16 km in
+7 minutes: **average 139 km/h against a top speed of 82**. Integrating the speed
+samples over the same window gave 5.3 km, not 16.1.
+
+Time is now derived from distance and speed. Two follow-on artefacts had to go
+as well, both invisible while samples were a fixed 1 s apart:
+
+- per-point jitter of ±6.7 m against ~16 m spacing produced 0.02 s gaps, which
+  `MIN_DT` clamped into 4 g of acceleration that never happened;
+- independent ±4 km/h speed noise between ~1 s samples *is* ±3 m/s², which
+  manufactured 89 harsh brakes and 140 hard accelerations and scored a steady
+  cruise at comfort 0.
+
+The seeded race is now 15.7 km in 20–25 min at 38–47 km/h against a 70–83 km/h
+max, with zero spurious events. **None of the scoring work could be judged
+against the old data.**
 
 ---
 
@@ -193,11 +297,12 @@ just badly framed.
 1. **Landing framing fix** — section 4. Highest priority if the landing matters.
 2. **Analytics screen** (`AnalyticsScreen`, `StatsOverview`, `DriveScorePanel`) is still on old styling — never got the oversized-hero / sparkline / inverted-card pass.
 3. **`.env.production` points at a personal ngrok tunnel**, baked into APK builds. Any build handed to someone else only works while that PC and tunnel are up. Needs the Render URL.
-4. **Safety score is measured against a flat 120 km/h placeholder** (`analytics.DEFAULT_SPEED_LIMIT_KMH`), so city driving never registers as speeding. Scores aren't meaningful until road speed limits are map-matched.
-5. **`sqlmodel==0.0.8` pins Pydantic v1** (`orm_mode`, `.dict()`). Upgrading is a real migration.
-6. **In-memory WebSocket rooms = one backend instance.** Scaling needs Redis pub/sub.
-7. **Session #21 stuck `live`** — clears itself when that user next starts a drive.
+4. **Background location is untested on a real device.** The Android foreground service, the notification, and the 5-minute WebView network throttle all need an APK on a real phone, driven with the screen off. This is the single most valuable next check — §2b.
+5. **Speed-limit coverage depends on a warm tile cache.** A drive through an area nobody has driven before, while Overpass is unwell, scores with no speeding penalty and says so in the UI. It fixes itself as the cache fills. If coverage matters at scale, self-host Overpass or pay a provider.
+6. **`sqlmodel==0.0.8` pins Pydantic v1** (`orm_mode`, `.dict()`). Upgrading is a real migration.
+7. **In-memory WebSocket rooms = one backend instance.** Scaling needs Redis pub/sub. The socket now reconnects, which makes a restart survivable but not a second instance.
 8. **Cabin photo licensing** — Porsche press imagery, currently gitignored but shipped in builds.
+9. **Scores changed meaning.** Any score stored before this session was computed with the old speeding term and a flat 120 km/h limit; they aren't comparable to new ones. Re-run `seed_demo.py --reset --race` for demo data.
 
 ---
 
@@ -208,6 +313,10 @@ just badly framed.
 - **`requestAnimationFrame` is paused while the tab is hidden.** The globe, the replay playhead and the R3F render loop all freeze — the canvas even stays at its default 300×150 because R3F never sizes it. Not a bug; but it means *nothing animated can be verified without a visible browser*.
 - **`rm -f` exits 0 on a missing path.** An earlier commit claimed `wheel.png` was deleted; the `cd ..` had landed in `src/`, so it silently no-oped while the message asserted otherwise. Verify deletions.
 - **Pasted chat images have no filesystem path.** They must be saved manually before they can be used.
+- **`seed_demo.py` needs the backend stopped.** SQLite single-writer; otherwise it dies mid-run with "database is locked" and leaves partial data.
+- **The Windows console is cp1252.** `print`ing `→` or `·` raises `UnicodeEncodeError` *after* the work has committed, which looks like a failure that isn't one.
+- **Stubbed tests hid every real problem in the speed-limit work.** 19 unit tests passed against a fake Overpass while the live service produced 429s, 20× latency swings, and a gap-fill bug that would have mis-scored every partly-covered drive. For anything talking to a third-party service, probe the real thing once before believing the suite.
+- **Tests that pass are not tests that work.** Two "ordering" tests here used a palindromic limit pattern at constant speed, so pairing every limit with the wrong point produced identical numbers. Deliberately break the code and confirm the test fails.
 
 ---
 
@@ -221,6 +330,7 @@ backend/
     services.py       scoring rollup, room codes, abandoned-drive sweep
     deps.py           authorization — who may read which session
     analytics.py      pure scoring engine, no DB/IO
+    speed_limits.py   OSM map-matching + tile cache (the impure half)
     rate_limit.py     slowapi limiter
   migrations/         Alembic; runs on startup, SQLite + Postgres
   tests/              test_analytics, test_api_auth, test_sessions
@@ -233,7 +343,7 @@ stratum-web-react/src/
   landing/            LandingPage (film), CarStage (3D), CabinScene, useCinematic
   components/         CarDashboard, LiveMap, RacerPanel, RacerCard, TelemetryHUD, …
   screens/            Home, Garage, Analytics, Settings, Lobby, Live, CarMode, PostDrive, Auth
-  lib/                units, format, charts, replay, tiles, useRouteSession, useSessionSocket
+  lib/                units, format, charts, replay, tiles, tracking, useRouteSession, useSessionSocket
   store.ts            zustand — token, user, vehicles, session, units
 ```
 
