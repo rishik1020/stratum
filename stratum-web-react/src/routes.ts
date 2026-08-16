@@ -15,6 +15,7 @@ export const routes = {
   joinSession: "/sessions/join",
   lobby: (id: number | string) => `/sessions/${id}/lobby`,
   live: (id: number | string) => `/sessions/${id}/live`,
+  carMode: (id: number | string) => `/sessions/${id}/car`,
   results: (id: number | string) => `/sessions/${id}/results`,
   replay: (id: number | string) => `/sessions/${id}/replay`,
 } as const

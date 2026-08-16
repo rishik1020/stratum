@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
-import { Navigation } from "lucide-react"
+import { CarDashboard, DashboardState } from "../components/CarDashboard"
 
 import { BEATS, ramp, window_ } from "./useCinematic"
 
@@ -52,66 +52,50 @@ const speedAt = (t: number) =>
 
 const driveProgress = (t: number) => ramp(t, BEATS.launch, BEATS.runtime)
 
-/** What's rendered onto the car's screen. Kept dense — it's a small target. */
-function ScreenContent({ t, started }: { t: number; started: boolean }) {
-  const p = driveProgress(t)
+/**
+ * A drawn route standing in for the live map.
+ *
+ * The real dashboard mounts Leaflet over satellite tiles; a 15-second landing
+ * beat shouldn't pull either. Same shape, none of the weight.
+ */
+function FilmMap({ p }: { p: number }) {
   return (
-    <div className="flex h-full w-full flex-col bg-[#08080a]">
-      <div className="flex items-center justify-between px-[4%] pt-[3%]">
-        <span className="display text-[min(1.1vw,13px)] leading-none tracking-tight text-white/80">
-          STRATUM
-        </span>
-        <span className="flex items-center gap-[0.3em] text-[min(0.75vw,9px)] uppercase leading-none tracking-[0.14em] text-amber">
-          <span className={`h-[0.4em] w-[0.4em] rounded-full bg-amber ${started ? "live-dot" : ""}`} />
-          {started ? "Rec" : "Ready"}
-        </span>
-      </div>
-
-      <div className="relative mx-[4%] mt-[3%] flex-1 overflow-hidden rounded-[3px] bg-[#0e0e11]">
-        <svg viewBox="0 0 200 74" preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
+    <div className="h-full w-full bg-[#0b0d0a]">
+      <svg viewBox="0 0 400 220" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+        <defs>
+          <radialGradient id="terrain" cx="62%" cy="38%" r="72%">
+            <stop offset="0%" stopColor="#26301f" />
+            <stop offset="60%" stopColor="#151a12" />
+            <stop offset="100%" stopColor="#0b0d0a" />
+          </radialGradient>
+        </defs>
+        <rect width="400" height="220" fill="url(#terrain)" />
+        {[0, 1, 2, 3, 4].map((i) => (
           <path
-            d="M14 64 C 50 64, 56 36, 84 34 S 130 40, 152 20 S 182 10, 192 7"
+            key={i}
+            d={`M${-40 + i * 46} 220 C ${30 + i * 46} 150, ${10 + i * 46} 90, ${80 + i * 52} 0`}
             fill="none"
-            stroke="#FFB020"
-            strokeWidth="3"
-            strokeLinecap="round"
-            pathLength={1}
-            style={{ strokeDasharray: 1, strokeDashoffset: 1 - p }}
+            stroke="rgba(255,255,255,0.05)"
+            strokeWidth="18"
           />
-          {started && <circle cx={14 + p * 178} cy={64 - p * 57} r="3.4" fill="#FFB020" />}
-        </svg>
-
-        {!started && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <motion.div
-              animate={{ scale: [1, 1.09, 1] }}
-              transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
-              className="flex h-[46%] w-auto aspect-square items-center justify-center rounded-full bg-amber text-amber-ink"
-            >
-              <Navigation size={11} />
-            </motion.div>
-          </div>
-        )}
-      </div>
-
-      <div className="flex items-end justify-between px-[4%] pb-[3.5%] pt-[3%]">
-        <div>
-          <div className="text-[min(0.7vw,8px)] uppercase leading-none tracking-[0.14em] text-white/35">
-            Speed
-          </div>
-          <div className="stat-num text-[min(1.6vw,19px)] font-medium leading-none text-white">
-            {speedAt(t)}
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-[min(0.7vw,8px)] uppercase leading-none tracking-[0.14em] text-white/35">
-            Score
-          </div>
-          <div className="stat-num text-[min(1.6vw,19px)] font-medium leading-none text-amber">
-            {started ? 60 + Math.round(p * 34) : "—"}
-          </div>
-        </div>
-      </div>
+        ))}
+        <path
+          d="M40 196 C 118 190, 128 128, 196 118 S 292 118, 330 56 S 372 26, 392 16"
+          fill="none"
+          stroke="rgba(255,255,255,0.16)"
+          strokeWidth="5"
+          strokeLinecap="round"
+        />
+        <path
+          d="M40 196 C 118 190, 128 128, 196 118 S 292 118, 330 56 S 372 26, 392 16"
+          fill="none"
+          stroke="#FFB020"
+          strokeWidth="4"
+          strokeLinecap="round"
+          pathLength={1}
+          style={{ strokeDasharray: 1, strokeDashoffset: 1 - p, filter: "drop-shadow(0 0 6px rgba(255,176,32,0.6))" }}
+        />
+      </svg>
     </div>
   )
 }
@@ -135,6 +119,16 @@ export function CabinScene({ t }: { t: number }) {
 
   const started = t >= START_PRESS
   const p = driveProgress(t)
+
+  const dash: DashboardState = {
+    speedKmh: speedAt(t),
+    distanceM: Math.round(p * 12_500),
+    score: started ? 60 + Math.round(p * 34) : null,
+    gapM: started ? Math.round(180 * (1 - p)) : null,
+    elapsedS: Math.max(0, Math.round(t - START_PRESS)),
+    connected: true,
+    recording: started,
+  }
 
   return (
     <motion.div style={{ opacity }} className="absolute inset-0 z-30 overflow-hidden bg-ink">
@@ -178,6 +172,7 @@ export function CabinScene({ t }: { t: number }) {
       />
 
       {/* --- The app, on the car's screen -------------------------------- */}
+      {hasPhoto && (
       <div className="absolute inset-0" style={{ perspective: "900px" }}>
         <div
           className="absolute overflow-hidden rounded-[3px]"
@@ -191,17 +186,28 @@ export function CabinScene({ t }: { t: number }) {
             boxShadow: "0 0 22px rgba(255,176,32,0.22)",
           }}
         >
-          <ScreenContent t={t} started={started} />
+          <CarDashboard
+            state={dash}
+            sessionName="Hyderabad run"
+            map={<FilmMap p={p} />}
+            primaryLabel={started ? "End drive" : "Start drive"}
+            interactive={false}
+          />
         </div>
       </div>
+      )}
 
       {/* Without the photo the beat still plays, just plainly. */}
       {!hasPhoto && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-[min(340px,80vw)] overflow-hidden rounded-xl border border-hairline-strong bg-ink-1 shadow-float">
-            <div className="h-[190px]">
-              <ScreenContent t={t} started={started} />
-            </div>
+          <div className="aspect-[16/10] w-[min(620px,86vw)] overflow-hidden rounded-2xl border border-hairline-strong shadow-float">
+            <CarDashboard
+              state={dash}
+              sessionName="Hyderabad run"
+              map={<FilmMap p={p} />}
+              primaryLabel={started ? "End drive" : "Start drive"}
+              interactive={false}
+            />
           </div>
         </div>
       )}

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { initials } from "../lib/format"
+import { Basemap, BASEMAPS, BASEMAP_DIM } from "../lib/tiles"
 
 export interface MapPosition {
   lat: number
@@ -59,8 +60,8 @@ const pinIcon = (
 
 /**
  * Live participant map. Each racer is a circular avatar pin — amber ring for
- * you, neutral for everyone else — on a dark CARTO basemap, with an optional
- * badge under the pin (speed while racing).
+ * you, neutral for everyone else — over satellite imagery by default, with an
+ * optional badge under the pin (speed while racing).
  *
  * Pins glide between updates (eased every frame) so they don't snap on each
  * ~1 Hz GPS fix, and the map aggressively recomputes its size so it renders on
@@ -80,6 +81,7 @@ export const LiveMap = ({
   onSelect,
   showControls = true,
   followSelected = false,
+  basemap = "satellite",
 }: {
   positions: Record<string, MapPosition>
   meName?: string
@@ -90,6 +92,7 @@ export const LiveMap = ({
   onSelect?: (name: string) => void
   showControls?: boolean
   followSelected?: boolean
+  basemap?: Basemap
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -115,10 +118,23 @@ export const LiveMap = ({
       center: [20, 0],
       zoom: 2,
     })
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      attribution: "&copy; OpenStreetMap &copy; CARTO",
-      maxZoom: 19,
+    const tiles = BASEMAPS[basemap]
+    const layer = L.tileLayer(tiles.url, {
+      attribution: tiles.attribution,
+      maxZoom: tiles.maxZoom,
     }).addTo(map)
+    // Satellite imagery is daylight-bright; dim it so amber trails and white
+    // pins stay readable on top. Applied to the tile pane only, so markers and
+    // polylines keep their full contrast.
+    const dim = BASEMAP_DIM[basemap]
+    if (dim > 0) {
+      const applyDim = () => {
+        const el = layer.getContainer()
+        if (el) el.style.filter = `brightness(${1 - dim})`
+      }
+      applyDim()
+      layer.on("load", applyDim)
+    }
     mapRef.current = map
 
     // Mobile/WebView lay the container out after init → recompute size now, on a

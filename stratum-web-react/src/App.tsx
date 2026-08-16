@@ -30,6 +30,7 @@ const CreateSessionScreen = lazy(() => import("./screens/CreateSessionScreen").t
 const JoinSessionScreen = lazy(() => import("./screens/JoinSessionScreen").then((m) => ({ default: m.JoinSessionScreen })))
 const LobbyScreen = lazy(() => import("./screens/LobbyScreen").then((m) => ({ default: m.LobbyScreen })))
 const LiveScreen = lazy(() => import("./screens/LiveScreen").then((m) => ({ default: m.LiveScreen })))
+const CarModeScreen = lazy(() => import("./screens/CarModeScreen").then((m) => ({ default: m.CarModeScreen })))
 const PostDriveScreen = lazy(() => import("./screens/PostDriveScreen").then((m) => ({ default: m.PostDriveScreen })))
 
 const Loading = () => (
@@ -108,6 +109,9 @@ function AppRoutes() {
           <Route path={routes.joinSession} element={<JoinSessionScreen />} />
           <Route path="/sessions/:sessionId/lobby" element={<LobbyScreen />} />
           <Route path="/sessions/:sessionId/live" element={<LiveScreen />} />
+          {/* Car mode — the drive on a phone in a mount. Not CarPlay; see
+              components/CarDashboard.tsx for why that name isn't used. */}
+          <Route path="/sessions/:sessionId/car" element={<CarModeScreen />} />
           {/* Results and replay are one screen — the drive ended, here's what
               happened. /replay is kept so older shared links still resolve. */}
           <Route path="/sessions/:sessionId/results" element={<PostDriveScreen />} />

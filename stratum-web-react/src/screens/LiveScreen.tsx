@@ -12,7 +12,7 @@ import { TelemetryHUD, TelemetryFrame } from "../components/TelemetryHUD"
 import { fmtClock } from "../lib/format"
 import { useUnits } from "../lib/units"
 import { AnimatePresence } from "framer-motion"
-import { MapPin, ChevronDown, ChevronUp } from "lucide-react"
+import { MapPin, ChevronDown, ChevronUp, Maximize2 } from "lucide-react"
 
 interface RosterEntry {
   displayName: string
@@ -396,6 +396,16 @@ export const LiveScreen = () => {
           </div>
         </div>
       )}
+
+      {/* Into the mounted-phone view. */}
+      <button
+        onClick={() => routeSessionId && navigate(routes.carMode(routeSessionId))}
+        aria-label="Car mode"
+        title="Car mode"
+        className="absolute right-4 top-4 z-[500] rounded-full border border-hairline-strong bg-ink-2/90 p-2.5 text-white/70 backdrop-blur-xl transition-colors hover:text-white md:hidden"
+      >
+        <Maximize2 size={16} />
+      </button>
 
       {/* Floating detail card for the picked racer. */}
       <div className="pointer-events-none absolute right-4 top-4 z-[500] hidden md:block">
