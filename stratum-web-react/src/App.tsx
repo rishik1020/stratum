@@ -18,10 +18,10 @@ import { useAppStore } from "./store"
 import { AuthScreen } from "./screens/AuthScreen"
 import { HomeScreen } from "./screens/HomeScreen"
 
-// Split the heavy leaves out of the initial bundle. The landing page alone
-// pulls in framer-motion, lenis and the globe canvas, and the analytics screens
-// pull in Recharts — none of which a driver opening the live map needs. This
-// matters on the target device: a phone on mobile data.
+// Split the heavy leaves out of the initial bundle — the analytics screens
+// pull in Recharts, the session screens pull in Leaflet, and a driver opening
+// the live map needs neither. This matters on the target device: a phone on
+// mobile data.
 const LandingPage = lazy(() => import("./landing/LandingPage").then((m) => ({ default: m.LandingPage })))
 const GarageScreen = lazy(() => import("./screens/GarageScreen").then((m) => ({ default: m.GarageScreen })))
 const AnalyticsScreen = lazy(() => import("./screens/AnalyticsScreen").then((m) => ({ default: m.AnalyticsScreen })))

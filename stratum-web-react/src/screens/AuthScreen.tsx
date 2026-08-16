@@ -4,7 +4,7 @@ import { useAppStore } from "../store"
 import { routes } from "../routes"
 import { setAuthToken, auth, errorMessage } from "../api"
 import { Mail, Lock, User } from "lucide-react"
-import { Logo } from "../landing/ui"
+import { Logo } from "../components/Logo"
 
 export const AuthScreen = () => {
   const navigate = useNavigate()

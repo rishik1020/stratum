@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom"
 import { useAppStore } from "../store"
 import { routes } from "../routes"
 import { LayoutDashboard, Car, BarChart3, Settings, LogOut } from "lucide-react"
-import { Logo } from "../landing/ui"
+import { Logo } from "./Logo"
 
 interface NavItem {
   to: string
