@@ -20,6 +20,17 @@ export const BEATS = {
   uiOut: 13.0,
   /** "Start" is pressed — recording begins, but the car hasn't moved yet. */
   start: 9.4,
+  /**
+   * The car pulls away while we're still inside.
+   *
+   * Without this the in-car dashboard reads 0 km/h and 0 km for nearly three
+   * seconds — which is exactly the window where it has finally scaled up and
+   * become readable. The one beat that exists to show live telemetry was
+   * showing zeros. The exterior launch below is still the "and then it goes"
+   * moment; this is just the car actually moving off first, which is also what
+   * happens in a car.
+   */
+  cabinRoll: 9.9,
   /** The camera is back outside and the car launches. */
   launch: 11.9,
   launchFor: 3.5,
