@@ -128,6 +128,17 @@ function startWeb({ onFix, onError }: StartOptions): Tracker {
     return { mode: "foreground-only", stop: async () => {} }
   }
 
+  // Browsers only expose location on a secure origin. Opening the dev server
+  // from a phone over http://<lan-ip> trips this, and the browser's own message
+  // ("Only secure origins are allowed", plus a goo.gl link) tells you nothing
+  // about what to do — so say it plainly instead of forwarding it.
+  if (!window.isSecureContext) {
+    onError(
+      "Location needs a secure connection (https). Open Stratum over https, or on this device directly."
+    )
+    return { mode: "foreground-only", stop: async () => {} }
+  }
+
   const watchId = navigator.geolocation.watchPosition(
     (pos) => {
       const c = pos.coords

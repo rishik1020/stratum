@@ -72,3 +72,34 @@ the camera is) and a `look` (what it aims at), all in metres.
 Every model puts its door and seats in slightly different places, so expect to
 nudge the last two shots once a real car is in. Scroll slowly with the page
 open and adjust `pos`/`look` until the interior shot frames the dash.
+
+## The mobile build
+
+Phones are served `public/car-mobile.glb` instead — the same model with its
+textures capped at 1024px. Regenerate it whenever `car.glb` changes:
+
+```bash
+cd stratum-web-react
+python scripts/shrink-glb.py public/car.glb public/car-mobile.glb --max 1024
+```
+
+Both files are gitignored; this one is derived, so rebuild rather than commit it.
+
+**Why a script and not `gltf-transform resize`:** this model carries two
+palette-mode PNGs and one luminance+alpha PNG, and libvips — which
+gltf-transform uses for image work — fails on all three with
+`colourspace: parameter space not set`. Pillow reads them without complaint.
+
+**Why it matters:** the full model ships a 2048×4096 base-colour texture. That
+is 3.6 MB on disk and **44.7 MB once uploaded to the GPU**, alongside a
+2048×2048 at 22.4 MB — roughly 95 MB of texture memory for a car drawn about a
+thousand pixels wide. Capping at 1024 takes the file from 8.3 MB to 4.2 MB and
+the texture budget to about 30 MB.
+
+Check what a model actually costs before shipping it:
+
+```bash
+npx @gltf-transform/cli inspect public/car.glb
+```
+
+The `gpuSize` column is the one that decides whether a phone copes.

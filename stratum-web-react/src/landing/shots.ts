@@ -1,5 +1,5 @@
 /**
- * Camera paths for the car scene.
+ * The camera path for the car scene.
  *
  * Split out from CarStage so the component file exports only components —
  * mixing the two breaks Fast Refresh, and these are data anyone tuning the
@@ -16,15 +16,6 @@ export interface Shot {
   look: number[]
   fov: number
 }
-
-export const FILM_SHOTS: Shot[] = [
-  { at: 0.0, pos: [-9.4, 1.05, 0.2], look: [0, 0.68, 0], fov: 34 }, // flat side profile
-  { at: 3.2, pos: [-8.2, 1.0, 1.9], look: [0, 0.68, 0.1], fov: 34 }, // drift forward
-  { at: 6.4, pos: [-3.1, 1.25, 0.9], look: [-0.6, 0.95, 0.3], fov: 40 }, // toward the glass
-  { at: 9.6, pos: [-2.2, 1.2, 0.6], look: [-0.5, 0.95, 0.35], fov: 42 }, // held while start is pressed
-  { at: 11.8, pos: [-6.2, 1.5, -5.6], look: [0, 0.7, 0], fov: 38 }, // back outside, rear 3/4
-  { at: 15.4, pos: [-5.4, 1.35, -7.4], look: [0, 0.7, 2.2], fov: 46 }, // watch it go
-]
 
 /**
  * The scroll orbit — a walk around the car rather than a narrative.

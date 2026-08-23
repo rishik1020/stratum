@@ -6,6 +6,7 @@ import { routes } from "../routes"
 import { Logo } from "../components/Logo"
 import { CarStage } from "./CarStage"
 import { ORBIT_SHOTS } from "./shots"
+import { PhoneScene } from "./PhoneScene"
 import { useSmoothScroll } from "./useSmoothScroll"
 import { Marquee, MaskLine, PillLink, Reveal, SectionHead, Statement } from "./editorial"
 
@@ -68,6 +69,13 @@ export function ScrollLanding() {
   const orbit = useRef(0)
   useEffect(() => scrollYProgress.on("change", (v) => (orbit.current = v)), [scrollYProgress])
 
+  // The phone beat gets its own range, measured the same way.
+  const phoneRef = useRef<HTMLDivElement>(null)
+  const { scrollYProgress: phoneProgress } = useScroll({
+    target: phoneRef,
+    offset: ["start start", "end end"],
+  })
+
   // The wordmark holds through the opening, then clears so the car is alone.
   const titleOpacity = useTransform(scrollYProgress, [0, 0.14, 0.26], [1, 1, 0])
   const titleY = useTransform(scrollYProgress, [0, 0.26], [0, -70])
@@ -110,7 +118,7 @@ export function ScrollLanding() {
       <section ref={orbitRef} className="relative h-[300vh]">
         <div className="sticky top-0 h-[100dvh] overflow-hidden">
           <motion.div style={still ? undefined : { opacity: stageFade }} className="absolute inset-0">
-            <CarStage time={orbit} shots={ORBIT_SHOTS} drive={false} />
+            <CarStage time={orbit} shots={ORBIT_SHOTS} />
           </motion.div>
 
           {/* Vignette — grounds the car and keeps the copy legible over it. */}
@@ -173,6 +181,13 @@ export function ScrollLanding() {
         text="TRACK · SCORE · RACE"
         className="display text-[clamp(2rem,7vw,5rem)] text-white/[0.07]"
       />
+
+      {/* --- The phone -----------------------------------------------------
+          Four viewports: the device rises in, a drive runs on it, and the score
+          lands. The car sells the idea; this is the thing you actually use. */}
+      <section ref={phoneRef} className="relative h-[400vh]">
+        <PhoneScene progress={phoneProgress} />
+      </section>
 
       {/* --- Features ------------------------------------------------------ */}
       <div className="mx-auto w-full max-w-6xl px-5 md:px-10">

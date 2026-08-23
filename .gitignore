@@ -59,6 +59,8 @@ Thumbs.db
 # The car is a large binary that changes rarely and isn't source. Keep it out
 # of history; see docs/CAR_MODEL.md for how to regenerate it.
 stratum-web-react/public/car.glb
+# Derived from car.glb by scripts/shrink-glb.py — rebuild it, don't commit it.
+stratum-web-react/public/car-mobile.glb
 
 # ── Cabin photographs ─────────────────────────────────────────────────────
 # Manufacturer press imagery — kept out of the repo for the same reason as the

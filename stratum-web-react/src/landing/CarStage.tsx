@@ -1,13 +1,21 @@
 import { Suspense, useEffect, useRef, useState } from "react"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
-import { ContactShadows, Environment, useGLTF } from "@react-three/drei"
+import { ContactShadows, Environment, Lightformer, useGLTF } from "@react-three/drei"
 import * as THREE from "three"
 
-import { BEATS, easeInOut, easeOut, ramp } from "./useCinematic"
-import { FILM_SHOTS, Shot } from "./shots"
+import { easeInOut } from "./ease"
+import { ORBIT_SHOTS, Shot } from "./shots"
 
 /** Where to drop the model. See docs/CAR_MODEL.md. */
 const CAR_MODEL_URL = "/car.glb"
+
+/**
+ * Same car, textures capped at 1024px — 4.2 MB instead of 8.3 MB, and ~30 MB of
+ * GPU texture memory instead of ~95 MB. The full-size model ships a 2048x4096
+ * base colour map, which is 44 MB on the GPU on its own, for a car drawn about
+ * a thousand pixels wide. Built by `scripts/shrink-glb.py`.
+ */
+const CAR_MODEL_URL_SMALL = "/car-mobile.glb"
 
 /** Locally vendored so the APK decodes Draco offline, not off a CDN. */
 const DRACO_PATH = "/draco/"
@@ -42,14 +50,38 @@ function shotAt(time: number, shots: Shot[]) {
 /** The aspect the shots were framed at. Narrower frames pull the camera back. */
 const REFERENCE_ASPECT = 16 / 9
 
-const LAUNCH_AT = BEATS.launch
-const LAUNCH_FOR = BEATS.launchFor
+/**
+ * Render settings, chosen once from the device.
+ *
+ * A phone was being asked for exactly what a laptop gets: shadow maps, a 2x
+ * pixel ratio (four times the pixels), and a full-resolution contact shadow.
+ * The scene is a dark car on a dark ground — dropping the shadow map costs
+ * almost nothing visually and is the single biggest per-frame saving.
+ */
+interface Quality {
+  dpr: [number, number]
+  shadows: boolean
+  shadowMap: number
+  contactShadowRes: number
+  /** Cube size for the generated environment. Rendered once, never fetched.
+   *  64px is plenty on a phone: reflections on a car body are broad and
+   *  low-frequency, so the resolution buys almost nothing visible. */
+  envRes: number
+  /** The lighter model, for devices that will not enjoy 95 MB of textures. */
+  smallModel: boolean
+}
 
-/** How far down the road the car is at time `t`, in metres. */
-function launchDistance(t: number) {
-  const p = ramp(t, LAUNCH_AT, LAUNCH_AT + LAUNCH_FOR)
-  // Quadratic — it pulls away rather than sliding at constant speed.
-  return easeOut(p) * 46 * p
+function pickQuality(): Quality {
+  if (typeof window === "undefined")
+    return { dpr: [1, 1.5], shadows: true, shadowMap: 1024, contactShadowRes: 512, envRes: 128, smallModel: true }
+  const coarse = window.matchMedia("(pointer: coarse)").matches
+  const narrow = window.innerWidth < 900
+  // Treat "coarse pointer or small screen" as mobile: a phone browser is the
+  // case that was janking, and a small laptop gains from this too.
+  if (coarse || narrow) {
+    return { dpr: [1, 1.25], shadows: false, shadowMap: 512, contactShadowRes: 256, envRes: 64, smallModel: true }
+  }
+  return { dpr: [1, 1.75], shadows: true, shadowMap: 1024, contactShadowRes: 512, envRes: 256, smallModel: false }
 }
 
 function CameraRig({ time, shots }: { time: React.MutableRefObject<number>; shots: Shot[] }) {
@@ -93,7 +125,7 @@ function CameraRig({ time, shots }: { time: React.MutableRefObject<number>; shot
  * Normalises whatever model turns up — centres it, scales it to a known
  * length, sits the wheels on the ground — and drives it forward on launch.
  */
-function Car({ url, time, drive }: { url: string; time: React.MutableRefObject<number>; drive: boolean }) {
+function Car({ url }: { url: string }) {
   const { scene } = useGLTF(url, DRACO_PATH)
   const outer = useRef<THREE.Group>(null)
   const inner = useRef<THREE.Group>(null)
@@ -147,13 +179,6 @@ function Car({ url, time, drive }: { url: string; time: React.MutableRefObject<n
     wheels.current = found
   }, [scene])
 
-  useFrame(() => {
-    const d = drive ? launchDistance(time.current) : 0
-    if (outer.current) outer.current.position.z = d
-    // Wheel circumference ≈ 2m, so radians ≈ distance.
-    for (const w of wheels.current) w.rotation.x = -d
-  })
-
   return (
     <group ref={outer}>
       <group ref={inner}>
@@ -164,13 +189,9 @@ function Car({ url, time, drive }: { url: string; time: React.MutableRefObject<n
 }
 
 /** Shown until a model exists — a lit plinth, so the scene still reads. */
-function Placeholder({ time, drive }: { time: React.MutableRefObject<number>; drive: boolean }) {
-  const ref = useRef<THREE.Group>(null)
-  useFrame(() => {
-    if (ref.current) ref.current.position.z = drive ? launchDistance(time.current) : 0
-  })
+function Placeholder() {
   return (
-    <group ref={ref}>
+    <group>
       <mesh position={[0, 0.55, 0]} castShadow>
         <boxGeometry args={[1.85, 1.05, 4.2]} />
         <meshStandardMaterial color="#15151a" roughness={0.35} metalness={0.7} />
@@ -183,40 +204,63 @@ function Scene({
   time,
   modelUrl,
   shots,
-  drive,
+  quality,
 }: {
   time: React.MutableRefObject<number>
   modelUrl: string | null
   shots: Shot[]
-  drive: boolean
+  quality: Quality
 }) {
-  const shadow = useRef<any>(null)
-  // The contact shadow travels with the car so it doesn't stay parked.
-  useFrame(() => {
-    if (shadow.current) shadow.current.position.z = drive ? launchDistance(time.current) : 0
-  })
-
   return (
     <>
       <CameraRig time={time} shots={shots} />
 
       {/* Mostly silhouette with lit edges: cool key from the front, amber rim
           from behind, matching the reference's night-studio look. */}
-      <ambientLight intensity={0.3} />
-      <spotLight position={[7, 9, 7]} angle={0.5} penumbra={1} intensity={110} castShadow />
-      <spotLight position={[-8, 4, -6]} angle={0.6} penumbra={1} intensity={55} color="#FFB020" />
-      <spotLight position={[-9, 2.5, 4]} angle={0.7} penumbra={1} intensity={35} color="#bcd4ff" />
-      <Environment preset="night" />
+      {/* The environment is built here rather than downloaded.
+          `preset="night"` pulled a 1.7 MB HDR from raw.githack.com on every
+          visit — a third-party dependency, a heavy download on a phone, and
+          PMREM work on top. But dropping it entirely flattened the car: a
+          glossy body is mostly what it reflects, and without an environment it
+          renders as a black cutout. These lightformers are the reflections,
+          art-directed rather than photographed, and cost one small render. */}
+      <Environment resolution={quality.envRes} frames={1}>
+        {/* Long soft strip overhead — the highlight that runs the length of the
+            roof and shoulder line. */}
+        <Lightformer form="rect" intensity={2.6} position={[0, 5, -1]} scale={[10, 2, 1]} rotation={[Math.PI / 2, 0, 0]} color="#cfd8e6" />
+        {/* Warm rim from behind, so the trailing edge picks up the brand amber. */}
+        <Lightformer form="rect" intensity={3.4} position={[-6, 2, -4]} scale={[6, 3, 1]} rotation={[0, -Math.PI / 3, 0]} color="#FFB020" />
+        {/* Cool fill from the front quarter. */}
+        <Lightformer form="rect" intensity={1.6} position={[7, 2, 4]} scale={[6, 3, 1]} rotation={[0, Math.PI / 2.6, 0]} color="#9fc0ff" />
+        {/* Dark floor, so the lower body does not glow. */}
+        <Lightformer form="rect" intensity={0.35} position={[0, -3, 0]} scale={[12, 12, 1]} rotation={[-Math.PI / 2, 0, 0]} color="#0b0d12" />
+      </Environment>
 
-      <Suspense fallback={<Placeholder time={time} drive={drive} />}>
-        {modelUrl ? (
-          <Car url={modelUrl} time={time} drive={drive} />
-        ) : (
-          <Placeholder time={time} drive={drive} />
-        )}
+      <hemisphereLight args={["#2a3340", "#05060a", 0.35]} />
+      <ambientLight intensity={0.22} />
+      <spotLight
+        position={[7, 9, 7]}
+        angle={0.5}
+        penumbra={1}
+        intensity={110}
+        castShadow={quality.shadows}
+        shadow-mapSize={[quality.shadowMap, quality.shadowMap]}
+      />
+      <spotLight position={[-8, 4, -6]} angle={0.6} penumbra={1} intensity={62} color="#FFB020" />
+      <spotLight position={[-9, 2.5, 4]} angle={0.7} penumbra={1} intensity={38} color="#bcd4ff" />
+
+      <Suspense fallback={<Placeholder />}>
+        {modelUrl ? <Car url={modelUrl} /> : <Placeholder />}
       </Suspense>
 
-      <ContactShadows ref={shadow} position={[0, 0.01, 0]} opacity={0.8} scale={18} blur={2.6} far={4} />
+      <ContactShadows
+        position={[0, 0.01, 0]}
+        opacity={0.8}
+        scale={18}
+        blur={2.6}
+        far={4}
+        resolution={quality.contactShadowRes}
+      />
     </>
   )
 }
@@ -231,48 +275,48 @@ function Scene({
  */
 export function CarStage({
   time,
-  shots = FILM_SHOTS,
-  drive = true,
+  shots = ORBIT_SHOTS,
   className = "!absolute inset-0",
 }: {
   time: React.MutableRefObject<number>
   shots?: Shot[]
-  drive?: boolean
   className?: string
 }) {
   const [modelUrl, setModelUrl] = useState<string | null>(null)
   const [checked, setChecked] = useState(false)
+  const [quality] = useState(pickQuality)
 
   // Only load a model if one has actually been dropped in — otherwise useGLTF
   // throws on a 404 and takes the whole canvas down with it.
   useEffect(() => {
     let cancelled = false
-    fetch(CAR_MODEL_URL, { method: "HEAD" })
+    const url = quality.smallModel ? CAR_MODEL_URL_SMALL : CAR_MODEL_URL
+    fetch(url, { method: "HEAD" })
       .then((r) => {
         if (cancelled) return
         const type = r.headers.get("content-type") ?? ""
         // A dev server with SPA fallback answers 200 with index.html for a
         // missing file, so check the type rather than trusting the status.
-        if (r.ok && !type.includes("text/html")) setModelUrl(CAR_MODEL_URL)
+        if (r.ok && !type.includes("text/html")) setModelUrl(url)
       })
       .catch(() => {})
       .finally(() => !cancelled && setChecked(true))
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [quality.smallModel])
 
   if (!checked) return null
 
   return (
     <Canvas
-      shadows
-      dpr={[1, 2]}
+      shadows={quality.shadows}
+      dpr={quality.dpr}
       gl={{ antialias: true, powerPreference: "high-performance" }}
       camera={{ position: [shots[0].pos[0], shots[0].pos[1], shots[0].pos[2]], fov: shots[0].fov }}
       className={className}
     >
-      <Scene time={time} modelUrl={modelUrl} shots={shots} drive={drive} />
+      <Scene time={time} modelUrl={modelUrl} shots={shots} quality={quality} />
     </Canvas>
   )
 }

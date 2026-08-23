@@ -1,17 +1,21 @@
+import basicSsl from '@vitejs/plugin-basic-ssl'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
+// `npm run dev:https` sets this. Geolocation (and the Screen Wake Lock, and
+// DeviceMotion) are gated on a *secure context*, and http://<lan-ip> is not
+// one — so a phone on the LAN can browse the UI over plain http but cannot
+// start a drive. A self-signed cert makes the LAN origin secure; the phone
+// shows a one-time warning to accept.
+const https = process.env.HTTPS === '1'
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), ...(https ? [basicSsl()] : [])],
   server: {
     port: 3000,
     // Bind every interface, not just localhost, so the dev server is reachable
-    // from a phone on the same Wi-Fi (http://<your-lan-ip>:3000).
-    //
-    // Note: geolocation needs a secure context, so over plain http on the LAN
-    // the browser will refuse to start a drive. Layout, navigation and the
-    // gestures are all testable this way; recording needs an HTTPS tunnel
-    // (ngrok / cloudflared), which allowedHosts below already accommodates.
+    // from a phone on the same Wi-Fi. Use `npm run dev:https` when you need to
+    // actually record a drive from that phone — see the note above.
     host: true,
     // Allow any Host header so HTTPS tunnels (ngrok / cloudflared / loca.lt) work.
     allowedHosts: true,
