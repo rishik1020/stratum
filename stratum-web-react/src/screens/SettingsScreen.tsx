@@ -125,7 +125,7 @@ export const SettingsScreen = () => {
           <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className={inputClass} placeholder="Tell the crew about your build…" />
         </div>
         {error && <p className="text-negative text-sm">{error}</p>}
-        <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50">
+        <button type="submit" disabled={saving} className="pressable btn-primary disabled:opacity-50">
           {saving ? "Saving…" : saved ? "Saved ✓" : "Save profile"}
         </button>
       </form>
@@ -139,7 +139,7 @@ export const SettingsScreen = () => {
               <button
                 key={u}
                 onClick={() => setUnits(u)}
-                className={`px-5 py-2 rounded-xl font-medium text-sm border transition-colors ${
+                className={`pressable min-h-[44px] rounded-xl border px-5 py-2.5 text-sm font-medium transition-colors ${
                   units === u
                     ? "bg-ink-3 text-white border-white/20"
                     : "bg-ink-1 text-white/50 border-hairline hover:bg-white/[0.05]"

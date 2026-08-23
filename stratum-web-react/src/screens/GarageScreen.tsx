@@ -96,7 +96,7 @@ export const GarageScreen = () => {
           <span className="eyebrow">Garage</span>
           <h2 className="display text-5xl mt-2">Your vehicles</h2>
         </div>
-        <button onClick={() => setShowAdd((s) => !s)} className="btn-primary flex items-center gap-2">
+        <button onClick={() => setShowAdd((s) => !s)} className="pressable btn-primary flex items-center gap-2">
           <Plus size={18} />
           {showAdd ? "Close" : "Add vehicle"}
         </button>
@@ -143,7 +143,7 @@ export const GarageScreen = () => {
                       <Check size={14} /> Active
                     </span>
                   ) : (
-                    <button onClick={() => handleActivate(v.id)} className="btn-secondary text-sm py-1 px-3">
+                    <button onClick={() => handleActivate(v.id)} className="tap pressable btn-secondary px-3 py-1.5 text-sm">
                       Set active
                     </button>
                   )}
@@ -152,13 +152,13 @@ export const GarageScreen = () => {
                       <button
                         onClick={() => handleDelete(v.id)}
                         disabled={deletingId === v.id}
-                        className="text-xs font-bold px-2 py-1 rounded bg-negative/20 text-negative hover:bg-negative/30 disabled:opacity-50"
+                        className="tap pressable rounded bg-negative/20 px-2.5 py-1.5 text-xs font-bold text-negative hover:bg-negative/30 disabled:opacity-50"
                       >
                         {deletingId === v.id ? "Deleting…" : "Confirm"}
                       </button>
                       <button
                         onClick={() => setConfirmId(null)}
-                        className="text-xs px-2 py-1 rounded text-white/60 hover:text-white"
+                        className="tap pressable rounded px-2.5 py-1.5 text-xs text-white/60 hover:text-white"
                       >
                         Cancel
                       </button>
@@ -167,7 +167,7 @@ export const GarageScreen = () => {
                     <button
                       onClick={() => setConfirmId(v.id)}
                       title="Delete vehicle"
-                      className="p-2 rounded-lg text-white/50 hover:text-negative hover:bg-negative/10 transition-colors"
+                      className="tap pressable rounded-lg p-2 text-white/50 transition-colors hover:bg-negative/10 hover:text-negative"
                     >
                       <Trash2 size={16} />
                     </button>

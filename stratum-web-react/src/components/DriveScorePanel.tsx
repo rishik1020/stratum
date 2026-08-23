@@ -113,13 +113,15 @@ export const DriveScorePanel = ({ sessionId }: { sessionId: number }) => {
         <span className="eyebrow">latest drive</span>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      {/* The ring sits above the bars on a phone; side by side left the
+          bars ~120px wide with their labels clipped. */}
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 sm:gap-6">
         <div className="flex flex-col items-center justify-center">
           <ScoreRing value={score.overall} />
           <p className="text-xs text-white/60 mt-3 text-center">{insights.summary}</p>
         </div>
 
-        <div className="col-span-2 space-y-3">
+        <div className="space-y-3 sm:col-span-2">
           <SubBar icon={<Shield size={14} className="text-amber" />} label="Safety" value={score.safety} />
           <SubBar icon={<Leaf size={14} className="text-positive" />} label="Eco" value={score.eco} />
           <SubBar icon={<Gauge size={14} className="text-amber" />} label="Performance" value={score.performance} />
@@ -127,7 +129,7 @@ export const DriveScorePanel = ({ sessionId }: { sessionId: number }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-3 mt-6">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           ["Distance", `${toDist(metrics.distance_m)} ${distUnit}`],
           ["Moving", fmtDuration(metrics.moving_time_s)],
@@ -170,7 +172,7 @@ export const DriveScorePanel = ({ sessionId }: { sessionId: number }) => {
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-4 mt-5">
+      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           {insights.strengths.length > 0 && (
             <>

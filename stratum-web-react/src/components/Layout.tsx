@@ -1,7 +1,11 @@
-import { ReactNode } from "react"
-import { NavLink, useNavigate } from "react-router-dom"
+import { ReactNode, useRef } from "react"
+import { AnimatePresence, motion } from "framer-motion"
+import { NavLink, useLocation, useNavigate } from "react-router-dom"
 import { useAppStore } from "../store"
-import { routes } from "../routes"
+import { HUB_ROUTES, routes } from "../routes"
+import { useSwipeNav } from "../lib/useSwipeNav"
+import { requestRefresh } from "../lib/refresh"
+import { PullToRefresh } from "./PullToRefresh"
 import { LayoutDashboard, Car, BarChart3, Settings, LogOut } from "lucide-react"
 import { Logo } from "./Logo"
 
@@ -22,6 +26,20 @@ export const Layout = ({ children }: { children: ReactNode }) => {
   const user = useAppStore((s) => s.user)
   const logout = useAppStore((s) => s.logout)
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Swipe between the four tabs on touch devices.
+  useSwipeNav()
+
+  // Which way the next screen should come from. Comparing tab indices means a
+  // swipe (or a tap two tabs across) animates in the direction you actually
+  // travelled, instead of every screen sliding the same way.
+  const index = HUB_ROUTES.indexOf(location.pathname)
+  const prevIndex = useRef(index)
+  const direction = index >= 0 && prevIndex.current >= 0 && index !== prevIndex.current
+    ? Math.sign(index - prevIndex.current)
+    : 0
+  prevIndex.current = index
 
   const signOut = () => {
     logout()
@@ -45,7 +63,7 @@ export const Layout = ({ children }: { children: ReactNode }) => {
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) =>
-                  `w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                  `flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors ${
                     isActive
                       ? "bg-amber-10 text-amber"
                       : "text-white/45 hover:bg-ink-3 hover:text-white/80"
@@ -65,7 +83,7 @@ export const Layout = ({ children }: { children: ReactNode }) => {
             </div>
             <button
               onClick={signOut}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm text-white/45 hover:bg-ink-3 hover:text-white/80 transition-colors"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-white/45 transition-colors hover:bg-ink-3 hover:text-white/80"
             >
               <LogOut size={18} />
               Sign out
@@ -76,13 +94,30 @@ export const Layout = ({ children }: { children: ReactNode }) => {
         {/* Mobile top bar */}
         <header className="md:hidden sticky top-0 z-40 flex items-center justify-between px-4 pt-safe pb-3 bg-ink/90 backdrop-blur-md">
           <Logo size={26} />
-          <button onClick={signOut} className="-mr-2 p-2 text-white/50 active:text-white" aria-label="Sign out">
+          <button onClick={signOut} className="tap pressable -mr-2 p-2 text-white/50 active:text-white" aria-label="Sign out">
             <LogOut size={18} />
           </button>
         </header>
 
         {/* Content. pb-nav keeps the last row clear of the floating pill. */}
-        <main className="flex-1 md:overflow-y-auto md:max-h-screen pb-nav md:pb-0">{children}</main>
+        <main className="flex-1 overflow-x-hidden pb-nav md:max-h-screen md:overflow-y-auto md:pb-0">
+          {/* Slides in from the side you swiped from. mode="popLayout" keeps the
+              outgoing screen out of flow so the two never stack and double the
+              page height mid-transition. */}
+          <PullToRefresh onRefresh={requestRefresh}>
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.div
+                key={location.pathname}
+                initial={{ opacity: 0, x: direction === 0 ? 0 : direction * 28 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: direction === 0 ? 0 : direction * -28 }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              >
+                {children}
+              </motion.div>
+            </AnimatePresence>
+          </PullToRefresh>
+        </main>
 
         {/* Mobile floating pill nav.
             Inset from the edges with its own elevation so it reads as floating
@@ -102,7 +137,7 @@ export const Layout = ({ children }: { children: ReactNode }) => {
                 aria-label={item.label}
                 title={item.label}
                 className={({ isActive }) =>
-                  `w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+                  `pressable flex h-12 w-12 items-center justify-center rounded-full transition-colors ${
                     isActive ? "bg-amber text-amber-ink" : "text-white/45 active:text-white/80"
                   }`
                 }

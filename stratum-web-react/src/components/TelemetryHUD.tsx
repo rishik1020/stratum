@@ -117,7 +117,11 @@ export const TelemetryHUD = ({
             max={Math.max(1, Math.floor(total))}
             value={Math.floor(elapsedS)}
             onChange={(e) => onSeek?.(Number(e.target.value))}
-            className="w-full accent-amber cursor-pointer"
+            // The HUD floats over the map inside a pointer-events-none layer, so map
+            // drags pass through its empty areas. Nothing re-enabled events for the
+            // scrubber, which meant it animated along but could never be grabbed —
+            // onSeek had no way to fire. Only this control opts back in.
+            className="scrub pointer-events-auto w-full cursor-pointer accent-amber"
           />
         ) : (
           <div className="h-0.5 rounded-full bg-ink-3 overflow-hidden">

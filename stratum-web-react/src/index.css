@@ -12,8 +12,10 @@
     --safe-right: env(safe-area-inset-right, 0px);
 
     /* Height of the floating pill nav plus its bottom margin — screens pad
-       their content by this so nothing hides underneath it. */
-    --nav-clearance: calc(72px + var(--safe-bottom));
+       their content by this so nothing hides underneath it.
+       Measured, not guessed: the pill renders 66px tall and sits 16px off the
+       bottom, so 72px left the last row 10px under it. */
+    --nav-clearance: calc(94px + var(--safe-bottom));
   }
 
   html,
@@ -149,6 +151,97 @@
   /* Clears the floating nav. Screens inside the hub layout use this. */
   .pb-nav {
     padding-bottom: var(--nav-clearance);
+  }
+
+  /* --- Touch ------------------------------------------------------------ */
+
+  /* A thumb needs ~44px. Several controls were drawn at 24-30px because they
+     were sized for a mouse pointer: the analytics range chips, the replay
+     speed buttons, the garage row actions. This keeps the *visual* size but
+     extends the hit area with a pseudo-element, so the design doesn't have to
+     grow chunky to become usable. */
+  @media (pointer: coarse) {
+    .tap {
+      position: relative;
+    }
+    .tap::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: max(100%, 44px);
+      height: max(100%, 44px);
+    }
+  }
+
+  /* Tap feedback. Without it a touch device gives no acknowledgement until the
+     screen changes, which reads as an unresponsive app rather than a fast one.
+     Pointer-coarse only, so mice keep hover instead. */
+  @media (pointer: coarse) {
+    .pressable {
+      transition: transform 120ms ease, opacity 120ms ease;
+    }
+    .pressable:active {
+      transform: scale(0.97);
+      opacity: 0.9;
+    }
+  }
+
+  /* Scrub bars. A native range input renders a ~16px track with a small thumb,
+     which is fine with a mouse and almost ungrabbable with a finger. The track
+     stays slim; only the thumb and the hit area grow. */
+  .scrub {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 28px;
+    background: transparent;
+    cursor: pointer;
+  }
+  .scrub::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+  }
+  .scrub::-moz-range-track {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+  }
+  .scrub::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    margin-top: -7px;
+    border-radius: 999px;
+    background: #FFB020;
+    border: 2px solid #08080A;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  }
+  .scrub::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    background: #FFB020;
+    border: 2px solid #08080A;
+  }
+
+  /* Horizontal chip rows scroll rather than wrap or squeeze on narrow screens. */
+  .rail {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    overscroll-behavior-x: contain;
+  }
+  .rail::-webkit-scrollbar {
+    display: none;
+  }
+  .rail > * {
+    scroll-snap-align: start;
+    flex: none;
   }
 }
 

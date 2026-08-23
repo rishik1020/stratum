@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Trash2, Play } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { useAppStore, SessionFilter } from "../store"
@@ -8,6 +8,7 @@ import { axisProps, gridProps, RACER_PALETTE, tooltipStyle } from "../lib/charts
 import { useUnits } from "../lib/units"
 import { DriveScorePanel } from "../components/DriveScorePanel"
 import { StatsOverview } from "../components/StatsOverview"
+import { useRefreshSignal } from "../lib/refresh"
 import {
   ResponsiveContainer,
   LineChart,
@@ -53,8 +54,8 @@ export const AnalyticsScreen = () => {
   const [filter, setFilter] = useState<SessionFilter>(initialFilter)
   const [statsRefresh, setStatsRefresh] = useState(0)
 
-  useEffect(() => {
-    const run = async () => {
+  const load = useCallback(async () => {
+    {
       try {
         if (!user) {
           const profile = await userApi.getProfile()
@@ -75,9 +76,20 @@ export const AnalyticsScreen = () => {
         setLoading(false)
       }
     }
-    run()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  // Pull-to-refresh: re-read sessions and bump the stats panel's own key.
+  useRefreshSignal(
+    useCallback(() => {
+      void load()
+      setStatsRefresh((k) => k + 1)
+    }, [load])
+  )
 
   // Speed trace for the latest sprint, pivoted so every racer is one line:
   // rows are keyed by whole-second elapsed time with a speed column per racer.
@@ -166,7 +178,7 @@ export const AnalyticsScreen = () => {
 
           <div className="card">
             <h3 className="font-semibold mb-4">Latest sprint — speed by racer ({speedUnit})</h3>
-            <div className="h-72">
+            <div className="h-72" data-no-swipe>
               {traceRows.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-white/50 text-sm text-center px-4">
                   No telemetry recorded for your latest sprint (race with location enabled to capture a trace).
@@ -205,7 +217,7 @@ export const AnalyticsScreen = () => {
                   <button
                     key={f}
                     onClick={() => setFilter(f)}
-                    className={`px-3 py-1 rounded-md text-xs font-medium capitalize transition-colors ${
+                    className={`tap pressable rounded-md px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
                       filter === f ? "bg-white/[0.08] text-white" : "text-white/45 hover:text-white/80"
                     }`}
                   >
@@ -221,14 +233,14 @@ export const AnalyticsScreen = () => {
             ) : (
             <ul className="space-y-2">
               {visibleSessions.slice(0, 15).map((s) => (
-                <li key={s.session_id} className="flex items-center justify-between bg-ink-2 border border-hairline rounded-lg px-4 py-3">
-                  <div>
-                    <strong className="block">{s.name}</strong>
+                <li key={s.session_id} className="flex items-center justify-between gap-3 rounded-lg border border-hairline bg-ink-2 px-4 py-3">
+                  <div className="min-w-0">
+                    <strong className="block truncate">{s.name}</strong>
                     <span className="text-xs text-white/60">
                       {new Date(s.created_at).toLocaleDateString()} · {s.is_solo ? "solo drive" : s.status}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                     <div className="text-right">
                       <strong className="block">{toSpeed(s.top_speed_kmh)} {speedUnit}</strong>
                       <span className="text-xs text-white/60">
@@ -240,7 +252,7 @@ export const AnalyticsScreen = () => {
                         onClick={() => navigate(routes.replay(s.session_id))}
                         title="Watch replay"
                         aria-label={`Replay ${s.name}`}
-                        className="p-2 rounded-lg text-white/40 hover:text-amber hover:bg-white/[0.05] transition-colors"
+                        className="tap pressable rounded-lg p-2 text-white/40 transition-colors hover:bg-white/[0.05] hover:text-amber"
                       >
                         <Play size={16} />
                       </button>
@@ -251,7 +263,7 @@ export const AnalyticsScreen = () => {
                         disabled={deletingId === s.session_id}
                         title="Delete session"
                         aria-label={`Delete ${s.name}`}
-                        className="p-2 rounded-lg text-white/40 hover:text-negative hover:bg-negative/10 transition-colors disabled:opacity-40"
+                        className="tap pressable rounded-lg p-2 text-white/40 transition-colors hover:bg-negative/10 hover:text-negative disabled:opacity-40"
                       >
                         <Trash2 size={16} />
                       </button>

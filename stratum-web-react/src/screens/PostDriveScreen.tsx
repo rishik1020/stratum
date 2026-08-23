@@ -219,14 +219,14 @@ export const PostDriveScreen = () => {
       <button
         onClick={() => (playhead >= duration ? restart() : setPlaying((p) => !p))}
         aria-label={playing ? "Pause" : "Play"}
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber text-amber-ink transition-colors hover:bg-amber-soft"
+        className="pressable flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber text-amber-ink transition-colors hover:bg-amber-soft"
       >
         {playing ? <Pause size={18} /> : <Play size={18} className="ml-0.5" />}
       </button>
       <button
         onClick={restart}
         aria-label="Restart"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-hairline bg-ink-2 text-white/70 transition-colors hover:text-white"
+        className="tap pressable flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-hairline bg-ink-2 text-white/70 transition-colors hover:text-white"
       >
         <RotateCcw size={15} />
       </button>
@@ -235,7 +235,7 @@ export const PostDriveScreen = () => {
           <button
             key={s}
             onClick={() => setRate(s)}
-            className={`stat-num rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
+            className={`stat-num tap pressable rounded-lg border px-3 py-2 text-xs transition-colors ${
               rate === s
                 ? "border-amber bg-amber-10 text-amber"
                 : "border-hairline bg-transparent text-white/45 hover:text-white/80"
@@ -290,7 +290,10 @@ export const PostDriveScreen = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            {/* Three columns is ~105px each on a phone, which wrapped
+                "Top speed" and "Avg speed" onto two lines at uneven
+                heights. */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {[
                 ["Top speed", `${toSpeed(winner.top_speed_kmh)}`, speedUnit],
                 ["Distance", `${toDist(winner.total_distance_m)}`, distUnit],
@@ -325,11 +328,15 @@ export const PostDriveScreen = () => {
                 value={Math.floor(playhead)}
                 onChange={(e) => seek(Number(e.target.value))}
                 aria-label="Scrub replay"
-                className="mt-2 w-full accent-amber"
+                className="scrub mt-2 w-full accent-amber"
               />
             </div>
 
-            <div className="min-h-0 flex-1 py-2 max-lg:max-h-[280px]">
+            {/* A *definite* height on phones, not just a max. The aside has no
+                fixed height below lg, so RacerPanel's h-full resolved to auto,
+                its overflow-y-auto never engaged, and the list rendered straight
+                through the transport bar underneath it. */}
+            <div className="min-h-0 flex-1 overflow-hidden py-2 max-lg:h-[300px]">
               <RacerPanel
                 racers={standings}
                 avatars={avatars}

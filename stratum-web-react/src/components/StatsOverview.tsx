@@ -78,7 +78,7 @@ export const StatsOverview = ({ refreshKey = 0 }: { refreshKey?: number }) => {
             <button
               key={r.d}
               onClick={() => setDays(r.d)}
-              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+              className={`tap pressable rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                 days === r.d ? "bg-white/[0.08] text-white" : "text-white/45 hover:text-white/80"
               }`}
             >
@@ -89,7 +89,9 @@ export const StatsOverview = ({ refreshKey = 0 }: { refreshKey?: number }) => {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-3 gap-3 md:gap-4">
+      {/* Two-up on a phone. Three 110px columns forced "Active time" and
+          "60.9 km" to wrap mid-value, and left the cards ragged. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
         <div className="card">
           <span className="eyebrow">Distance</span>
           <strong className="stat-num text-2xl md:text-3xl font-medium block mt-2">
@@ -106,7 +108,9 @@ export const StatsOverview = ({ refreshKey = 0 }: { refreshKey?: number }) => {
             <Delta pct={stats?.deltas.drives_pct} />
           </div>
         </div>
-        <div className="card">
+        {/* Third of three in a two-column grid: span the row rather than leave
+            a hole beside it. */}
+        <div className="card col-span-2 sm:col-span-1">
           <span className="eyebrow">Active time</span>
           <strong className="stat-num text-2xl md:text-3xl font-medium block mt-2">{fmtHours(stats?.totals.moving_time_s || 0)}</strong>
           <div className="mt-1.5">
