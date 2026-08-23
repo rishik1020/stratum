@@ -87,8 +87,8 @@ export function CarDashboard({
 
   return (
     // containerType makes this box the reference for the cqw units used
-    // throughout, so the same component reads correctly full-screen in Car mode
-    // and shrunk into the cabin photo's centre display.
+    // throughout, so the type scales with the box rather than the viewport —
+    // which is what lets this render correctly at any size it is given.
     <div
       className="relative h-full w-full overflow-hidden bg-ink"
       style={{ containerType: "size" }}

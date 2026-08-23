@@ -31,6 +31,11 @@ cd ..\stratum-web-react && npm install
 | `run-tunnel-backend.cmd` | HTTPS tunnel to the **backend**, for the installed APK |
 | `db-snapshot.cmd` | Print a quick summary of the local database |
 
+> The phone scripts are **alternatives, not companions**. `run-phone.cmd`,
+> `run-tunnel.cmd` and `run-all.cmd` all want port 3000 — run one at a time.
+> `run-tunnel.cmd` in particular dials `http://localhost:3000`, so it cannot sit
+> on top of `run-phone.cmd`, which serves that port over HTTPS.
+
 Then open **http://127.0.0.1:3000**. Stop a server with `Ctrl+C` in its window
 (or just close the window).
 

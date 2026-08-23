@@ -122,14 +122,12 @@ function CameraRig({ time, shots }: { time: React.MutableRefObject<number>; shot
 }
 
 /**
- * Normalises whatever model turns up — centres it, scales it to a known
- * length, sits the wheels on the ground — and drives it forward on launch.
+ * Normalises whatever model turns up — centres it, scales it to a known length,
+ * and sits the wheels on the ground.
  */
 function Car({ url }: { url: string }) {
   const { scene } = useGLTF(url, DRACO_PATH)
-  const outer = useRef<THREE.Group>(null)
   const inner = useRef<THREE.Group>(null)
-  const wheels = useRef<THREE.Object3D[]>([])
 
   useEffect(() => {
     const group = inner.current
@@ -162,28 +160,17 @@ function Car({ url }: { url: string }) {
     group.scale.setScalar(scale)
     group.position.set(-centre.x * scale, -box.min.y * scale, -centre.z * scale)
 
-    // Round, roughly-wheel-sized meshes get spun during the launch.
-    const found: THREE.Object3D[] = []
     scene.traverse((o) => {
       const mesh = o as THREE.Mesh
       if (!mesh.isMesh || !mesh.visible) return
       mesh.castShadow = true
       mesh.receiveShadow = true
-      const b = mesh.geometry?.boundingBox
-      if (!b) return
-      const s = new THREE.Vector3()
-      b.getSize(s)
-      const round = Math.abs(s.y - s.z) < s.y * 0.25 && s.x < s.y * 0.9 && s.y > size.y * 0.25
-      if (round) found.push(mesh)
     })
-    wheels.current = found
   }, [scene])
 
   return (
-    <group ref={outer}>
-      <group ref={inner}>
-        <primitive object={scene} />
-      </group>
+    <group ref={inner}>
+      <primitive object={scene} />
     </group>
   )
 }

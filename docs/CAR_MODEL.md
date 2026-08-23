@@ -1,9 +1,9 @@
 # The landing-page car model
 
-The landing page is a scroll-driven scene: the camera orbits a car, moves to
-the driver's door, then settles inside the cabin. That needs a 3D model, and
-one isn't in the repo — it's the single thing blocking the page from looking
-finished.
+The landing page pins a car on screen and lets scroll walk the camera around it
+— side profile, round to the nose, a low front hero, then the tail. That needs a
+3D model, and one isn't in the repo (it's large, and its licence isn't ours to
+redistribute).
 
 ## Drop it here
 
@@ -20,8 +20,8 @@ page still works. No code change, no rebuild config.
 | | |
 |---|---|
 | **Format** | `.glb` (binary glTF — a single file, textures embedded) |
-| **Interior** | **Required.** The camera flies into the cabin; a body-only shell will be hollow inside. Look for "interior" in the model description. |
-| **Size** | Aim for **under 15 MB**. The APK ships this, and the web build serves it to phones on mobile data. |
+| **Interior** | **Not needed.** The camera stays outside for the whole orbit, so a body shell is fine — which is just as well, since the one in use has no cabin. |
+| **Size** | Aim for **under 15 MB**, and check `gpuSize` too — see "The mobile build" below. Texture *resolution* hurts phones more than file size does. |
 | **Orientation** | Facing **+Z**, wheels near **y = 0**. If it's rotated, see below. |
 | **Licence** | CC0 / CC-BY. If CC-BY, credit the author in the footer. |
 
@@ -64,7 +64,7 @@ roof, rotate the wrapper group in `FitToModel`:
 
 ## Tuning the camera path
 
-The five shots live in `SHOTS` at the top of `CarStage.tsx` — wide
+The camera path lives in `ORBIT_SHOTS` in `src/landing/shots.ts` — wide
 three-quarter, orbit past the front, driver's door, inside facing forward, and
 settled on the dash. Each has an `at` (scroll progress, 0–1), a `pos` (where
 the camera is) and a `look` (what it aims at), all in metres.

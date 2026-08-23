@@ -55,8 +55,7 @@ python seed_demo.py --reset --race
 
 | URL | What |
 |---|---|
-| `#/` | Landing film (sign out first — signed-in users get redirected) |
-| `#/?t=10.5` | Landing paused at 10.5s, on the in-car beat. **Only works if the hash is present at page load.** |
+| `#/` | Landing — scroll-driven (sign out first; signed-in users get redirected) |
 | `#/dashboard` | Hub |
 | `#/sessions/<id>/results` | The seeded race replay — `seed_demo.py` prints the id |
 | `#/sessions/:id/car` | Car mode |
@@ -126,8 +125,8 @@ the landing film feeds it a scripted clock, **Car mode** (`/sessions/:id/car`)
 feeds it live telemetry. The map is a **slot** so the landing can pass a
 lightweight SVG instead of pulling Leaflet onto the marketing page.
 
-Sizing is **`cqw`, not `vw`** — with viewport units the full-screen dashboard
-and the one inset into the cabin photo would use identical font sizes.
+Sizing is **`cqw`, not `vw`** — the type scales with the component's own box
+rather than the viewport, so it reads correctly at whatever size it is given.
 
 Basemap is now **Esri World Imagery** across live/replay/dashboard, tile pane
 dimmed to 58% brightness so amber trails stay legible. Attribution is required
@@ -251,82 +250,54 @@ against the old data.**
 |---|---|---|
 | `stratum-web-react/public/car.glb` | Porsche 911 Carrera 4S | Draco-compressed 25.4 MB → 7.9 MB. **Body shell only — no interior.** |
 | `stratum-web-react/public/draco/` | Draco decoder | **Committed.** Vendored locally so the APK decodes offline instead of off a Google CDN. |
-| `stratum-web-react/public/cabin/driver.jpg` | Driver's-POV interior photo | 1920×1080. Manufacturer press imagery — **licence it before going public.** |
 
 Regenerate the model: `npx @gltf-transform/cli draco <source>.glb public/car.glb`
 (texture compression fails on this machine — libvips colourspace error).
 
-See `docs/CAR_MODEL.md` and `public/cabin/README.md`.
+See `docs/CAR_MODEL.md`.
 
 ---
 
-## 4. ⚠ The landing page is the weak point
+## 4. The landing page, and the lesson from the first attempt
 
-**The user's verdict on the current landing design was "one of the worst
-designs ever made", and they were right.** Here is the honest post-mortem.
+The landing is now a scroll-driven page: a sticky car orbit the reader turns
+with the wheel, then a phone running a demo drive, then editorial sections.
+`ScrollLanding` owns the scroll ranges; see §7.
 
-### What's wrong
+**What was here before, and why it's worth remembering.** The first landing was
+a photo of a car interior with the dashboard UI composited onto the
+infotainment screen. The user's verdict was "one of the worst designs ever
+made", and they were right: the display is 14% of the frame width in that photo
+(267px of 1920), so the UI rendered into it was an illegible amber smudge. That
+was a framing problem, not a tuning one.
 
-Screenshot at desktop shows: the infotainment display is a dark rectangle with
-an amber smudge in it. That smudge is the entire `CarDashboard` — speed panel,
-session title, pills, map — crushed into ~200px wide. **The one thing the beat
-exists to show is the least legible thing on screen.**
+The reason it got that far is the part that generalises:
 
-Also: the photo is washed to flat grey by an over-heavy grading layer; the
-"CARPLAY · ANDROID AUTO · PHONE" caption sits across the windscreen line and is
-barely readable (and contradicts the Car-mode naming decision); nothing anchors
-the eye.
+> Roughly ten turns of visual design were produced without ever seeing a
+> rendered pixel. DOM and geometry checks were reported as "verified", which was
+> true and useless — they confirm an overlay sits at 52.6% of a photo and say
+> nothing about whether it looks like anything.
 
-### Root cause
+Three more instances of the same failure have happened since, all caught only by
+looking: Git Bash rewrote a `#/route` argument so an entire mobile audit
+screenshotted the dashboard five times; a screenshot flag froze animations so
+un-revealed text looked like a bug; and programmatic scrolling didn't drive
+Lenis, so reveals appeared broken through three rewrites of working code.
 
-Two things:
-
-1. **Framing.** The reference video frames the infotainment screen *large*,
-   filling most of the frame. The photo used here is a wide interior shot where
-   the display is **14% of the frame width** (267px of 1920). Rendering a rich
-   landscape UI into that can never work — it isn't a tuning problem.
-
-2. **Built blind.** Roughly ten turns of visual design were produced without
-   ever seeing a rendered pixel — the Browser pane was closed, which pauses
-   `requestAnimationFrame`, so the canvas never drew and screenshots failed.
-   DOM/geometry checks were reported as "verified", which was true and useless:
-   they confirm an overlay is at 52.6% of a photo, and say nothing about whether
-   it looks like anything. The design also accreted through four pivots
-   (globe → wheel → 3D car → CSS cockpit → photo composite) without a reset.
-
-### The agreed fix (started, NOT finished)
-
-Let the dashboard **lift off the dash and scale up to fill the frame**:
-interior establishes → UI becomes the hero at full resolution.
-
-A tight crop into the photo was rejected: the display is 267px wide in a 1920px
-source, so filling the frame with it means ~4.8× upscale and mush.
-
-Implementation was mid-write when the session ended. The approach:
-
-- Measure the photo box with a ref + `ResizeObserver` (it overflows the viewport to cover, so the display's position is a fraction of the *photo*, not the screen).
-- Interpolate the dashboard's rect in viewport px from the bezel rect → a centred rect ~82% of viewport width, driven by `easeInOut(ramp(t, 7.6, 9.2))`.
-- Flatten `rotateY` from -9° → 0 as it lifts; grow radius and shadow.
-- Grading light while establishing, deeper once lifted.
-- Caption to the top edge, clear of the dashboard.
-- Bottom line → "Car mode · Phone in a mount".
-
-**`CabinScene.tsx` is currently the pre-lift version** — committed and working,
-just badly framed.
+**Verify by looking at the pixels, and check the harness before believing it.**
 
 ---
+
 
 ## 5. Known issues / next up
 
-1. **Landing framing fix** — section 4. Highest priority if the landing matters.
-2. **Analytics screen** (`AnalyticsScreen`, `StatsOverview`, `DriveScorePanel`) is still on old styling — never got the oversized-hero / sparkline / inverted-card pass.
-3. **`.env.production` points at a personal ngrok tunnel**, baked into APK builds. Any build handed to someone else only works while that PC and tunnel are up. Needs the Render URL.
-4. **Background location is untested on a real device.** The Android foreground service, the notification, and the 5-minute WebView network throttle all need an APK on a real phone, driven with the screen off. This is the single most valuable next check — §2b.
-5. **Speed-limit coverage depends on a warm tile cache.** A drive through an area nobody has driven before, while Overpass is unwell, scores with no speeding penalty and says so in the UI. It fixes itself as the cache fills. If coverage matters at scale, self-host Overpass or pay a provider.
-6. **`sqlmodel==0.0.8` pins Pydantic v1** (`orm_mode`, `.dict()`). Upgrading is a real migration.
-7. **In-memory WebSocket rooms = one backend instance.** Scaling needs Redis pub/sub. The socket now reconnects, which makes a restart survivable but not a second instance.
-8. **Cabin photo licensing** — Porsche press imagery, currently gitignored but shipped in builds.
-9. **Scores changed meaning.** Any score stored before this session was computed with the old speeding term and a flat 120 km/h limit; they aren't comparable to new ones. Re-run `seed_demo.py --reset --race` for demo data.
+1. **Analytics screen** (`AnalyticsScreen`, `StatsOverview`, `DriveScorePanel`) is still on old styling — never got the oversized-hero / sparkline / inverted-card pass.
+2. **`.env.production` points at a personal ngrok tunnel**, baked into APK builds. Any build handed to someone else only works while that PC and tunnel are up. Needs the Render URL.
+3. **Background location is untested on a real device.** The Android foreground service, the notification, and the 5-minute WebView network throttle all need an APK on a real phone, driven with the screen off. This is the single most valuable next check — §2b.
+4. **Speed-limit coverage depends on a warm tile cache.** A drive through an area nobody has driven before, while Overpass is unwell, scores with no speeding penalty and says so in the UI. It fixes itself as the cache fills. If coverage matters at scale, self-host Overpass or pay a provider.
+5. **`sqlmodel==0.0.8` pins Pydantic v1** (`orm_mode`, `.dict()`). Upgrading is a real migration.
+6. **In-memory WebSocket rooms = one backend instance.** Scaling needs Redis pub/sub. The socket now reconnects, which makes a restart survivable but not a second instance.
+7. **Scores changed meaning.** Any score stored before this session was computed with the old speeding term and a flat 120 km/h limit; they aren't comparable to new ones. Re-run `seed_demo.py --reset --race` for demo data.
 
 ---
 
@@ -357,21 +328,25 @@ backend/
     speed_limits.py   OSM map-matching + tile cache (the impure half)
     rate_limit.py     slowapi limiter
   migrations/         Alembic; runs on startup, SQLite + Postgres
-  tests/              test_analytics, test_api_auth, test_sessions
-  run_tests.py        runs all three (no pytest needed)
+  tests/              analytics, api_auth, sessions, speed_limits, rate_limit, secret_key
+  run_tests.py        runs them all (no pytest needed)
   seed_demo.py        demo drives + the 4-car race
 
 stratum-web-react/src/
   App.tsx             routes, auth guards, lazy screens
   routes.ts           every path in one place
-  landing/            LandingPage (film), CarStage (3D), CabinScene, useCinematic
+  landing/            ScrollLanding (page), CarStage (3D) + shots, PhoneScene, editorial, useSmoothScroll, ease
   components/         CarDashboard, LiveMap, RacerPanel, RacerCard, TelemetryHUD, …
   screens/            Home, Garage, Analytics, Settings, Lobby, Live, CarMode, PostDrive, Auth
   lib/                units, format, charts, replay, tiles, tracking, useRouteSession, useSessionSocket
   store.ts            zustand — token, user, vehicles, session, units
 ```
 
-**The film's beat sheet is `BEATS` in `landing/useCinematic.ts`** — camera, cabin
-UI and page copy all read from it. They were split across three files once and
-drifted: the head unit read 115 km/h while the car was still parked, because
-speed was keyed to the button press instead of the launch.
+**The landing is one scroll timeline, not a clock.** `ScrollLanding` owns two
+scroll ranges — the car orbit and the phone beat — and hands each a progress
+value. `CarStage` reads its camera position from a ref every frame, so the 3D
+never goes through React. Camera paths are data in `landing/shots.ts`.
+
+The earlier version was a timed 15-second film whose beats lived in a `BEATS`
+table. It is gone, along with `LandingPage`, `CabinScene` and `useCinematic` —
+if you find a reference to any of those, it is stale.

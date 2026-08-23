@@ -16,6 +16,12 @@ REM   the certificate: tap Advanced, then Proceed. That warning is expected.
 REM
 REM   Same Wi-Fi only. To reach it from mobile data or someone else's phone, use
 REM   run-tunnel.cmd instead (public URL, real certificate, no warning).
+REM
+REM   Do not run both. run-tunnel.cmd dials http://localhost:3000, which this
+REM   script serves over HTTPS — the handshake fails and the tunnel serves
+REM   nothing. Use one or the other.
+REM
+REM   Also do not run this alongside run-all.cmd: both want port 3000.
 
 start "Stratum Backend"  cmd /k "%~dp0run-backend.cmd"
 
