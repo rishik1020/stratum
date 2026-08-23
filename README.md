@@ -26,7 +26,8 @@ cd ..\stratum-web-react && npm install
 | **`run-all.cmd`** | Starts backend **and** frontend, each in its own window. Start here. |
 | `run-backend.cmd` | Backend only — http://127.0.0.1:8000 |
 | `run-frontend.cmd` | Frontend only — http://127.0.0.1:3000 |
-| `run-tunnel.cmd` | HTTPS tunnel to the **frontend**, for testing in a phone browser |
+| **`run-phone.cmd`** | Backend + frontend over **HTTPS**, for testing on a phone on your Wi-Fi |
+| `run-tunnel.cmd` | HTTPS tunnel to the **frontend** — reaches a phone anywhere, not just your Wi-Fi |
 | `run-tunnel-backend.cmd` | HTTPS tunnel to the **backend**, for the installed APK |
 | `db-snapshot.cmd` | Print a quick summary of the local database |
 
