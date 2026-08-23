@@ -19,6 +19,30 @@ npm run dev
 
 **Test account** — `driver@stratum.app` / `stratum1234`
 
+### Testing on a phone
+
+```bash
+cd stratum-web-react
+npm run dev:https        # same port 3000, but TLS
+```
+
+Then open **`https://<your-lan-ip>:3000`** on the phone and accept the
+self-signed certificate once (Advanced → Proceed).
+
+`npm run dev` serves plain HTTP, and location, the Screen Wake Lock and
+DeviceMotion are all gated on a **secure context** — which `http://<lan-ip>` is
+not, though `http://localhost` is. Over plain HTTP the phone can browse the
+whole UI but cannot start a drive.
+
+Two traps, both hit for real:
+
+- **Match the scheme to the port.** Pointing `https://` at the plain-HTTP dev
+  server gives "This site can't provide a secure connection … invalid
+  response", which reads like a certificate problem and isn't one. Run one
+  server, not both.
+- A self-signed certificate warning is expected and fine. An
+  `ERR_SSL_PROTOCOL_ERROR` is not — that is the scheme/port mismatch above.
+
 Seeded with 8 solo drives plus a 4-car race (Hitec City → Charminar, 15.7 km,
 5200 telemetry points, ~21 min per car at 38–47 km/h). Regenerate with:
 
