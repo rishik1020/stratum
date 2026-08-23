@@ -4,6 +4,7 @@ import { ContactShadows, Environment, useGLTF } from "@react-three/drei"
 import * as THREE from "three"
 
 import { BEATS, easeInOut, easeOut, ramp } from "./useCinematic"
+import { FILM_SHOTS, Shot } from "./shots"
 
 /** Where to drop the model. See docs/CAR_MODEL.md. */
 const CAR_MODEL_URL = "/car.glb"
@@ -27,28 +28,22 @@ const DRACO_PATH = "/draco/"
  * Values assume a car ~4.5 m long facing +Z on y=0; <FitToModel> normalises
  * any model to that first.
  */
-const SHOTS = [
-  { at: 0.0, pos: [-9.4, 1.05, 0.2], look: [0, 0.68, 0], fov: 34 }, // flat side profile
-  { at: 3.2, pos: [-8.2, 1.0, 1.9], look: [0, 0.68, 0.1], fov: 34 }, // drift forward
-  { at: 6.4, pos: [-3.1, 1.25, 0.9], look: [-0.6, 0.95, 0.3], fov: 40 }, // toward the glass
-  { at: 9.6, pos: [-2.2, 1.2, 0.6], look: [-0.5, 0.95, 0.35], fov: 42 }, // held while start is pressed
-  { at: 11.8, pos: [-6.2, 1.5, -5.6], look: [0, 0.7, 0], fov: 38 }, // back outside, rear 3/4
-  { at: 15.4, pos: [-5.4, 1.35, -7.4], look: [0, 0.7, 2.2], fov: 46 }, // watch it go
-]
-
-const LAUNCH_AT = BEATS.launch
-const LAUNCH_FOR = BEATS.launchFor
-
-function shotAt(time: number) {
+function shotAt(time: number, shots: Shot[]) {
   let i = 0
-  while (i < SHOTS.length - 2 && SHOTS[i + 1].at < time) i++
-  const a = SHOTS[i]
-  const b = SHOTS[i + 1]
+  while (i < shots.length - 2 && shots[i + 1].at < time) i++
+  const a = shots[i]
+  const b = shots[i + 1]
   const span = b.at - a.at
   const f = easeInOut(Math.min(1, Math.max(0, span > 0 ? (time - a.at) / span : 0)))
   const mix = (x: number[], y: number[]) => x.map((v, k) => v + (y[k] - v) * f)
   return { pos: mix(a.pos, b.pos), look: mix(a.look, b.look), fov: a.fov + (b.fov - a.fov) * f }
 }
+
+/** The aspect the shots were framed at. Narrower frames pull the camera back. */
+const REFERENCE_ASPECT = 16 / 9
+
+const LAUNCH_AT = BEATS.launch
+const LAUNCH_FOR = BEATS.launchFor
 
 /** How far down the road the car is at time `t`, in metres. */
 function launchDistance(t: number) {
@@ -57,16 +52,31 @@ function launchDistance(t: number) {
   return easeOut(p) * 46 * p
 }
 
-function CameraRig({ time }: { time: React.MutableRefObject<number> }) {
-  const { camera } = useThree()
+function CameraRig({ time, shots }: { time: React.MutableRefObject<number>; shots: Shot[] }) {
+  const { camera, size } = useThree()
   const target = useRef(new THREE.Vector3(0, 0.68, 0))
 
   useFrame((_, delta) => {
-    const { pos, look, fov } = shotAt(time.current)
+    const { pos, look, fov } = shotAt(time.current, shots)
+
+    // Three's fov is *vertical*, so a portrait phone sees a far narrower slice
+    // horizontally than a laptop does and the car ran off both edges. Pull the
+    // camera back as the frame narrows, which keeps the same orbit while
+    // fitting the car — reframing rather than re-shooting.
+    const aspect = size.width / Math.max(1, size.height)
+    const pull = aspect < REFERENCE_ASPECT ? Math.min(2.05, REFERENCE_ASPECT / Math.max(0.35, aspect)) : 1
     // Frame-rate independent damping — a fixed lerp factor moves at different
     // speeds on 60 Hz and 120 Hz displays.
     const k = 1 - Math.pow(0.0022, delta)
-    camera.position.lerp(new THREE.Vector3(pos[0], pos[1], pos[2]), k)
+    // Scaled about the look target so the subject stays centred as it pulls out.
+    camera.position.lerp(
+      new THREE.Vector3(
+        look[0] + (pos[0] - look[0]) * pull,
+        look[1] + (pos[1] - look[1]) * pull,
+        look[2] + (pos[2] - look[2]) * pull
+      ),
+      k
+    )
     target.current.lerp(new THREE.Vector3(look[0], look[1], look[2]), k)
     camera.lookAt(target.current)
 
@@ -83,7 +93,7 @@ function CameraRig({ time }: { time: React.MutableRefObject<number> }) {
  * Normalises whatever model turns up — centres it, scales it to a known
  * length, sits the wheels on the ground — and drives it forward on launch.
  */
-function Car({ url, time }: { url: string; time: React.MutableRefObject<number> }) {
+function Car({ url, time, drive }: { url: string; time: React.MutableRefObject<number>; drive: boolean }) {
   const { scene } = useGLTF(url, DRACO_PATH)
   const outer = useRef<THREE.Group>(null)
   const inner = useRef<THREE.Group>(null)
@@ -138,7 +148,7 @@ function Car({ url, time }: { url: string; time: React.MutableRefObject<number> 
   }, [scene])
 
   useFrame(() => {
-    const d = launchDistance(time.current)
+    const d = drive ? launchDistance(time.current) : 0
     if (outer.current) outer.current.position.z = d
     // Wheel circumference ≈ 2m, so radians ≈ distance.
     for (const w of wheels.current) w.rotation.x = -d
@@ -154,10 +164,10 @@ function Car({ url, time }: { url: string; time: React.MutableRefObject<number> 
 }
 
 /** Shown until a model exists — a lit plinth, so the scene still reads. */
-function Placeholder({ time }: { time: React.MutableRefObject<number> }) {
+function Placeholder({ time, drive }: { time: React.MutableRefObject<number>; drive: boolean }) {
   const ref = useRef<THREE.Group>(null)
   useFrame(() => {
-    if (ref.current) ref.current.position.z = launchDistance(time.current)
+    if (ref.current) ref.current.position.z = drive ? launchDistance(time.current) : 0
   })
   return (
     <group ref={ref}>
@@ -169,16 +179,26 @@ function Placeholder({ time }: { time: React.MutableRefObject<number> }) {
   )
 }
 
-function Scene({ time, modelUrl }: { time: React.MutableRefObject<number>; modelUrl: string | null }) {
+function Scene({
+  time,
+  modelUrl,
+  shots,
+  drive,
+}: {
+  time: React.MutableRefObject<number>
+  modelUrl: string | null
+  shots: Shot[]
+  drive: boolean
+}) {
   const shadow = useRef<any>(null)
   // The contact shadow travels with the car so it doesn't stay parked.
   useFrame(() => {
-    if (shadow.current) shadow.current.position.z = launchDistance(time.current)
+    if (shadow.current) shadow.current.position.z = drive ? launchDistance(time.current) : 0
   })
 
   return (
     <>
-      <CameraRig time={time} />
+      <CameraRig time={time} shots={shots} />
 
       {/* Mostly silhouette with lit edges: cool key from the front, amber rim
           from behind, matching the reference's night-studio look. */}
@@ -188,8 +208,12 @@ function Scene({ time, modelUrl }: { time: React.MutableRefObject<number>; model
       <spotLight position={[-9, 2.5, 4]} angle={0.7} penumbra={1} intensity={35} color="#bcd4ff" />
       <Environment preset="night" />
 
-      <Suspense fallback={<Placeholder time={time} />}>
-        {modelUrl ? <Car url={modelUrl} time={time} /> : <Placeholder time={time} />}
+      <Suspense fallback={<Placeholder time={time} drive={drive} />}>
+        {modelUrl ? (
+          <Car url={modelUrl} time={time} drive={drive} />
+        ) : (
+          <Placeholder time={time} drive={drive} />
+        )}
       </Suspense>
 
       <ContactShadows ref={shadow} position={[0, 0.01, 0]} opacity={0.8} scale={18} blur={2.6} far={4} />
@@ -198,9 +222,24 @@ function Scene({ time, modelUrl }: { time: React.MutableRefObject<number>; model
 }
 
 /**
- * The car scene. Time comes in from the film clock; nothing here reads scroll.
+ * The car scene.
+ *
+ * The driving parameter arrives in a ref and is read every frame, so the same
+ * component works off a film clock or off scroll progress — it never reads
+ * either directly. `shots` picks which path the camera walks; `drive` is the
+ * film's launch, which the scroll orbit leaves off so the car stays framed.
  */
-export function CarStage({ time }: { time: React.MutableRefObject<number> }) {
+export function CarStage({
+  time,
+  shots = FILM_SHOTS,
+  drive = true,
+  className = "!absolute inset-0",
+}: {
+  time: React.MutableRefObject<number>
+  shots?: Shot[]
+  drive?: boolean
+  className?: string
+}) {
   const [modelUrl, setModelUrl] = useState<string | null>(null)
   const [checked, setChecked] = useState(false)
 
@@ -230,10 +269,10 @@ export function CarStage({ time }: { time: React.MutableRefObject<number> }) {
       shadows
       dpr={[1, 2]}
       gl={{ antialias: true, powerPreference: "high-performance" }}
-      camera={{ position: [-9.4, 1.05, 0.2], fov: 34 }}
-      className="!absolute inset-0"
+      camera={{ position: [shots[0].pos[0], shots[0].pos[1], shots[0].pos[2]], fov: shots[0].fov }}
+      className={className}
     >
-      <Scene time={time} modelUrl={modelUrl} />
+      <Scene time={time} modelUrl={modelUrl} shots={shots} drive={drive} />
     </Canvas>
   )
 }

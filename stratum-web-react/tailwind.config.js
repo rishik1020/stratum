@@ -57,6 +57,17 @@ module.exports = {
         card: "16px",
         pill: "999px",
       },
+      keyframes: {
+        // Two identical halves translated by exactly -50% of the track, so the
+        // loop point is invisible.
+        marquee: {
+          "0%": { transform: "translate3d(0,0,0)" },
+          "100%": { transform: "translate3d(-50%,0,0)" },
+        },
+      },
+      animation: {
+        marquee: "marquee 34s linear infinite",
+      },
       boxShadow: {
         // The floating pill nav needs real elevation to read as floating.
         float: "0 8px 32px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.4)",

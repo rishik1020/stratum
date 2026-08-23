@@ -26,7 +26,11 @@
   body {
     @apply bg-ink text-white/90 font-sans antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-    overflow-x: hidden;
+    /* `clip`, not `hidden`. Both stop sideways scrolling, but `hidden` makes
+       this a scroll container, and position: sticky then resolves against it
+       instead of the viewport — which silently breaks every sticky descendant.
+       The landing page's pinned car canvas just scrolled away with the page. */
+    overflow-x: clip;
     padding-left: var(--safe-left);
     padding-right: var(--safe-right);
   }
@@ -257,7 +261,8 @@
 
 html {
   -webkit-tap-highlight-color: transparent;
-  overflow-x: hidden;
+  /* See the note on body: `hidden` here would break sticky positioning too. */
+  overflow-x: clip;
 }
 
 .font-display {

@@ -22,7 +22,7 @@ import { HomeScreen } from "./screens/HomeScreen"
 // pull in Recharts, the session screens pull in Leaflet, and a driver opening
 // the live map needs neither. This matters on the target device: a phone on
 // mobile data.
-const LandingPage = lazy(() => import("./landing/LandingPage").then((m) => ({ default: m.LandingPage })))
+const LandingPage = lazy(() => import("./landing/ScrollLanding").then((m) => ({ default: m.ScrollLanding })))
 const GarageScreen = lazy(() => import("./screens/GarageScreen").then((m) => ({ default: m.GarageScreen })))
 const AnalyticsScreen = lazy(() => import("./screens/AnalyticsScreen").then((m) => ({ default: m.AnalyticsScreen })))
 const SettingsScreen = lazy(() => import("./screens/SettingsScreen").then((m) => ({ default: m.SettingsScreen })))
