@@ -5,6 +5,14 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
+    // Bind every interface, not just localhost, so the dev server is reachable
+    // from a phone on the same Wi-Fi (http://<your-lan-ip>:3000).
+    //
+    // Note: geolocation needs a secure context, so over plain http on the LAN
+    // the browser will refuse to start a drive. Layout, navigation and the
+    // gestures are all testable this way; recording needs an HTTPS tunnel
+    // (ngrok / cloudflared), which allowedHosts below already accommodates.
+    host: true,
     // Allow any Host header so HTTPS tunnels (ngrok / cloudflared / loca.lt) work.
     allowedHosts: true,
     proxy: {
